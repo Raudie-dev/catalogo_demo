@@ -1,0 +1,2129 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Administración | {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6">
+
+    <!-- Cabecera del Panel Privado del Dueño -->
+    <div class="bg-[#1E1B18] text-white rounded-2xl p-6 mb-6 shadow-md flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <span class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#8C4A32] text-white text-xs font-bold mb-2">
+                <i class="fa-solid fa-key text-[11px]"></i> Panel Privado de Administración
+            </span>
+            <h1 class="text-2xl font-extrabold tracking-tight">Gestión de {{ store_settings.store_name }}</h1>
+            <p class="text-xs sm:text-sm text-stone-300 mt-1">
+                Agrega prendas, configura precios al detal y al mayor, unidades mínimas, tallas, colores y administra pedidos.
+            </p>
+        </div>
+        <div class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 max-w-full">
+            <button type="button" onclick="openProductAdminModal()"
+                    class="h-9 px-3.5 rounded-xl bg-[#8C4A32] hover:bg-[#a1563b] text-white font-bold text-xs transition shadow-xs flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                <i class="fa-solid fa-plus text-[11px]"></i>
+                <span>Nueva Prenda</span>
+            </button>
+            <button type="button" onclick="switchAdminTab('promobanner')"
+                    class="h-9 px-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-semibold text-xs transition flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                <i class="fa-solid fa-bullhorn text-[#e89d84] text-[11px]"></i>
+                <span>Banner y Descuentos</span>
+            </button>
+            <button type="button" onclick="switchAdminTab('categories')"
+                    class="h-9 px-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-semibold text-xs transition flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                <i class="fa-solid fa-image text-[#e89d84] text-[11px]"></i>
+                <span>Categorías</span>
+            </button>
+            <button type="button" onclick="switchAdminTab('attributes')"
+                    class="h-9 px-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-semibold text-xs transition flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                <i class="fa-solid fa-palette text-[#e89d84] text-[11px]"></i>
+                <span>Colores y Tallas</span>
+            </button>
+            <button type="button" onclick="resetDemoCatalog()"
+                    title="Restaurar catálogo de demostración"
+                    class="h-9 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white font-medium text-xs transition flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                <i class="fa-solid fa-rotate-right text-[11px]"></i>
+                <span>Restaurar</span>
+            </button>
+            <a href="{% url 'catalog:owner_logout' %}"
+               class="h-9 px-3 rounded-xl bg-white/10 hover:bg-red-600 text-stone-300 hover:text-white font-medium text-xs transition flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                <i class="fa-solid fa-right-from-bracket text-[11px]"></i>
+                <span>Salir</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Tarjetas de Métricas -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-2xl p-4 border border-[#E5E0D8]">
+            <p class="text-xs text-stone-500 font-medium">Prendas Activas</p>
+            <p class="text-2xl font-extrabold text-[#1E1B18] mt-1">{{ products|length }}</p>
+            <p class="text-[11px] text-[#8C4A32] font-semibold mt-0.5">{{ wholesale_items_count }} con rebaja al mayor</p>
+        </div>
+        <div class="bg-white rounded-2xl p-4 border border-[#E5E0D8]">
+            <p class="text-xs text-stone-500 font-medium">Tallas y Colores Activos</p>
+            <p class="text-2xl font-extrabold text-[#1E1B18] mt-1">{{ sizes|length }} <span class="text-xs font-normal text-stone-500">tallas</span> · {{ colors|length }} <span class="text-xs font-normal text-stone-500">colores</span></p>
+            <button type="button" onclick="switchAdminTab('attributes')" class="text-[11px] text-[#8C4A32] font-bold hover:underline mt-0.5 inline-flex items-center gap-1">
+                Personalizar tallas y colores <i class="fa-solid fa-arrow-right text-[9px]"></i>
+            </button>
+        </div>
+        <div class="bg-white rounded-2xl p-4 border border-[#E5E0D8]">
+            <p class="text-xs text-stone-500 font-medium">Pedidos por Atender</p>
+            <p class="text-2xl font-extrabold text-amber-600 mt-1">{{ pending_orders_count }}</p>
+            <p class="text-[11px] text-stone-500 mt-0.5">De {{ orders|length }} órdenes totales</p>
+        </div>
+        <div class="bg-white rounded-2xl p-4 border border-[#E5E0D8]">
+            <p class="text-xs text-stone-500 font-medium">Ventas Registradas</p>
+            <p class="text-2xl font-extrabold text-emerald-700 mt-1">{{ store_settings.currency_symbol }}{{ total_sales|floatformat:2 }}</p>
+            <p class="text-[11px] text-stone-500 mt-0.5">Tasa ref: Bs. {{ store_settings.bcv_rate|floatformat:2 }}</p>
+        </div>
+    </div>
+
+    <!-- Pestañas -->
+    <div class="flex items-center gap-2 border-b border-stone-200 mb-6 overflow-x-auto no-scrollbar">
+        <button type="button" onclick="switchAdminTab('inventory')" id="tabBtn-inventory"
+                class="px-5 py-3 text-sm font-bold border-b-2 border-[#8C4A32] text-[#1E1B18] whitespace-nowrap">
+            <i class="fa-solid fa-shirt mr-1.5 text-[#8C4A32]"></i> Prendas y Precios ({{ products|length }})
+        </button>
+        <button type="button" onclick="switchAdminTab('promobanner')" id="tabBtn-promobanner"
+                class="px-5 py-3 text-sm font-medium border-b-2 border-transparent text-stone-500 hover:text-[#1E1B18] whitespace-nowrap">
+            <i class="fa-solid fa-bullhorn mr-1.5 text-[#8C4A32]"></i> Banner y Descuentos
+        </button>
+        <button type="button" onclick="switchAdminTab('categories')" id="tabBtn-categories"
+                class="px-5 py-3 text-sm font-medium border-b-2 border-transparent text-stone-500 hover:text-[#1E1B18] whitespace-nowrap">
+            <i class="fa-solid fa-image mr-1.5 text-[#8C4A32]"></i> Categorías ({{ categories|length }})
+        </button>
+        <button type="button" onclick="switchAdminTab('attributes')" id="tabBtn-attributes"
+                class="px-5 py-3 text-sm font-medium border-b-2 border-transparent text-stone-500 hover:text-[#1E1B18] whitespace-nowrap">
+            <i class="fa-solid fa-palette mr-1.5 text-[#8C4A32]"></i> Colores y Tallas ({{ sizes|length }} / {{ colors|length }})
+        </button>
+        <button type="button" onclick="switchAdminTab('orders')" id="tabBtn-orders"
+                class="px-5 py-3 text-sm font-medium border-b-2 border-transparent text-stone-500 hover:text-[#1E1B18] whitespace-nowrap">
+            <i class="fa-solid fa-receipt mr-1.5"></i> Pedidos Recibidos ({{ orders|length }})
+        </button>
+        <button type="button" onclick="switchAdminTab('settings')" id="tabBtn-settings"
+                class="px-5 py-3 text-sm font-medium border-b-2 border-transparent text-stone-500 hover:text-[#1E1B18] whitespace-nowrap">
+            <i class="fa-solid fa-sliders mr-1.5"></i> Ajustes de Tienda y Mayoreo
+        </button>
+    </div>
+
+    <!-- TAB 1: INVENTARIO -->
+    <section id="tabPanel-inventory" class="space-y-4">
+        <div class="bg-white rounded-2xl border border-[#E5E0D8] overflow-hidden shadow-xs">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead>
+                        <tr class="bg-[#FAF7F4] text-[#1E1B18] text-xs uppercase font-bold border-b border-[#E5E0D8]">
+                            <th class="py-3.5 px-4">Prenda</th>
+                            <th class="py-3.5 px-3">Precio Detal</th>
+                            <th class="py-3.5 px-3">Precio Al Mayor</th>
+                            <th class="py-3.5 px-3">Mínimo Mayor</th>
+                            <th class="py-3.5 px-3">Tallas y Colores</th>
+                            <th class="py-3.5 px-3">Stock</th>
+                            <th class="py-3.5 px-4 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-stone-100">
+                        {% for p in products %}
+                        <tr class="hover:bg-[#FAF7F4]/60 transition">
+                            <td class="py-3 px-4">
+                                <div class="flex items-center gap-3">
+                                    <img src="{{ p.image_url }}" alt="{{ p.name }}" class="w-12 h-14 object-cover rounded-lg border border-stone-200 shrink-0">
+                                    <div>
+                                        <p class="font-bold text-[#1E1B18] leading-snug">{{ p.name }}</p>
+                                        <p class="text-xs text-stone-500">{{ p.category.name }} · Ref: {{ p.sku|default:'N/A' }}</p>
+                                        {% if p.is_immediate %}
+                                        <span class="inline-block mt-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">En Stock Inmediato</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3 px-3 font-bold text-[#1E1B18]">
+                                {{ store_settings.currency_symbol }}{{ p.price_retail|floatformat:2 }}
+                            </td>
+                            <td class="py-3 px-3">
+                                <span class="font-extrabold text-[#8C4A32]">{{ store_settings.currency_symbol }}{{ p.price_wholesale|floatformat:2 }}</span>
+                                {% if p.discount_percent > 0 %}
+                                <span class="block text-[10px] font-bold text-emerald-700">Rebaja -{{ p.discount_percent }}%</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-3">
+                                <span class="px-2.5 py-1 rounded-full bg-[#FAF7F4] border border-[#E5E0D8] text-[#8C4A32] font-bold text-xs">
+                                    {{ p.wholesale_min_qty }}+ uds
+                                </span>
+                            </td>
+                            <td class="py-3 px-3">
+                                <div class="flex flex-wrap gap-1 mb-1">
+                                    {% for s in p.sizes.all %}
+                                    <span class="px-1.5 py-0.5 text-[10px] font-bold border border-stone-300 text-[#1E1B18] rounded">{{ s.name }}</span>
+                                    {% endfor %}
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    {% for c in p.colors.all %}
+                                    <span class="w-3.5 h-3.5 rounded-full border border-black/20" style="background-color: {{ c.hex_code }};" title="{{ c.name }}"></span>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                            <td class="py-3 px-3 text-xs font-semibold text-stone-700">
+                                {{ p.stock }} uds
+                            </td>
+                            <td class="py-3 px-4 text-right space-x-1 whitespace-nowrap">
+                                <button type="button" onclick="openProductAdminModal({{ p.id }})"
+                                        class="px-3 py-1.5 rounded-lg bg-[#FAF7F4] border border-[#E5E0D8] hover:bg-[#1E1B18] hover:text-white text-xs font-semibold transition">
+                                    <i class="fa-solid fa-pen-to-square"></i> Editar
+                                </button>
+                                <button type="button" onclick="deleteProductAdmin({{ p.id }}, '{{ p.name|escapejs }}')"
+                                        class="px-2.5 py-1.5 rounded-lg text-red-600 hover:bg-red-50 text-xs transition">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- TAB: BANNER PUBLICITARIO / DESCUENTO PRINCIPAL -->
+    <section id="tabPanel-promobanner" class="hidden space-y-6">
+        <!-- Banner Explicativo -->
+        <div class="bg-gradient-to-r from-[#1E1B18] via-[#2d2925] to-[#453e38] text-white rounded-2xl p-6 shadow-sm border border-stone-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-xs font-semibold text-stone-200 mb-2.5">
+                    <i class="fa-solid fa-bullhorn text-[#e89d84]"></i> Portada de la Tienda
+                </div>
+                <h2 class="text-xl font-extrabold tracking-tight">Banner Publicitario y Descuentos</h2>
+                <p class="text-xs text-stone-300 mt-1 max-w-2xl leading-relaxed">
+                    Personaliza el gran anuncio destacado de la página de inicio. Muestra promociones de temporada, descuentos en ropa, rebajas al mayor o publicita una prenda estrella con su foto y botón de compra directa.
+                </p>
+            </div>
+            <div class="flex items-center gap-3 shrink-0">
+                <a href="{% url 'catalog:index' %}" target="_blank"
+                   class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold transition flex items-center gap-2">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Ver Portada en Vivo
+                </a>
+            </div>
+        </div>
+
+        <!-- Formulario de Configuración y Vista Previa en Vivo 1:1 -->
+        <div class="bg-white rounded-2xl border border-[#E5E0D8] p-5 sm:p-6 shadow-xs">
+            <form id="promoBannerForm" onsubmit="savePromoBannerSettings(event)" class="space-y-6">
+                <input type="hidden" id="promoImageUrl" value="{{ store_settings.promo_image_url }}">
+                <input type="file" id="promoImageInput" accept="image/*" class="hidden" onchange="handlePromoImageFile(event)">
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                    
+                    <!-- Columna Izquierda: Formulario de Campos -->
+                    <div class="lg:col-span-6 space-y-5">
+                        
+                        <!-- Toggle Activar/Desactivar -->
+                        <div class="p-4 rounded-xl border border-stone-200 bg-[#FAF7F4] flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-bold text-[#1E1B18]">Mostrar este Banner en la Portada</p>
+                                <p class="text-[11px] text-stone-500 mt-0.5">Si se desactiva, la portada mostrará el catálogo directamente.</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="promoBannerActive" class="sr-only peer" {% if store_settings.promo_banner_active %}checked{% endif %} onchange="updatePromoLivePreview()">
+                                <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#8C4A32]"></div>
+                            </label>
+                        </div>
+
+                        <!-- Etiqueta / Badge Superior con sugerencias rápidas -->
+                        <div>
+                            <label class="block text-xs font-bold text-stone-700 mb-1">
+                                Etiqueta Superior (Badge)
+                            </label>
+                            <input type="text" id="promoBadge" value="{{ store_settings.promo_badge }}"
+                                   placeholder="Ej: COLECCIÓN SHIBUI, DESCUENTO 20%, LIQUIDACIÓN, OFERTA ESPECIAL"
+                                   oninput="updatePromoLivePreview()"
+                                   class="w-full px-3.5 py-2.5 text-sm border border-stone-300 rounded-xl bg-[#FAF7F4] focus:bg-white focus:outline-none focus:border-[#8C4A32]">
+                            <!-- Sugerencias a 1 clic -->
+                            <div class="flex flex-wrap gap-1.5 mt-2">
+                                <button type="button" onclick="setPromoBadgeQuick('DESCUENTO 20%')" class="px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-[10px] font-semibold transition">Descuento 20%</button>
+                                <button type="button" onclick="setPromoBadgeQuick('OFERTA ESPECIAL')" class="px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-[10px] font-semibold transition">Oferta Especial</button>
+                                <button type="button" onclick="setPromoBadgeQuick('LIQUIDACIÓN TOTAL')" class="px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-[10px] font-semibold transition">Liquidación</button>
+                                <button type="button" onclick="setPromoBadgeQuick('NUEVA TEMPORADA')" class="px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-[10px] font-semibold transition">Nueva Temporada</button>
+                                <button type="button" onclick="setPromoBadgeQuick('PRECIOS AL MAYOR')" class="px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-[10px] font-semibold transition">Precios al Mayor</button>
+                            </div>
+                        </div>
+
+                        <!-- Título Principal del Anuncio -->
+                        <div>
+                            <label class="block text-xs font-bold text-stone-700 mb-1">
+                                Título Principal del Anuncio <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="promoTitle" required value="{{ store_settings.promo_title }}"
+                                   placeholder="Ej: Body Manga Larga Escote en V, ¡Rebajas de Verano!, 2x1 en Conjuntos..."
+                                   oninput="updatePromoLivePreview()"
+                                   class="w-full px-3.5 py-2.5 text-sm font-bold border border-stone-300 rounded-xl bg-[#FAF7F4] focus:bg-white focus:outline-none focus:border-[#8C4A32]">
+                        </div>
+
+                        <!-- Vincular Prenda del Catálogo (Opcional) -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="text-xs font-bold text-stone-700">
+                                    Vincular Prenda del Catálogo (Opcional)
+                                </label>
+                                <span class="text-[11px] text-stone-400">Autocompleta precio y foto</span>
+                            </div>
+                            <select id="promoProductId" onchange="handlePromoProductChange(this.value)"
+                                    class="w-full px-3.5 py-2.5 text-xs border border-stone-300 rounded-xl bg-[#FAF7F4] focus:bg-white focus:outline-none focus:border-[#8C4A32]">
+                                <option value="" data-price="" data-wholesale="" data-img="">-- Ninguna (Anuncio libre o general de descuento) --</option>
+                                {% for p in products %}
+                                <option value="{{ p.id }}"
+                                        data-name="{{ p.name|escapejs }}"
+                                        data-price="{{ store_settings.currency_symbol }}{{ p.price_retail|floatformat:0 }}"
+                                        data-wholesale="Al Mayor: {{ store_settings.currency_symbol }}{{ p.price_wholesale|floatformat:2 }} (desde {{ p.wholesale_min_qty }} uds)"
+                                        data-img="{{ p.main_image }}"
+                                        {% if store_settings.promo_product and store_settings.promo_product.id == p.id %}selected{% endif %}>
+                                    {{ p.name }} ({{ store_settings.currency_symbol }}{{ p.price_retail|floatformat:2 }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Precio o Descuento Visible + Nota -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold text-stone-700 mb-1">
+                                    Precio o Descuento Visible
+                                </label>
+                                <input type="text" id="promoPrice" value="{{ store_settings.promo_price }}"
+                                       placeholder="Ej: $19, -30% OFF, Desde $10..."
+                                       oninput="updatePromoLivePreview()"
+                                       class="w-full px-3.5 py-2.5 text-sm font-bold border border-stone-300 rounded-xl bg-[#FAF7F4] focus:bg-white focus:outline-none focus:border-[#8C4A32]">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-stone-700 mb-1">
+                                    Nota de Precio
+                                </label>
+                                <input type="text" id="promoPriceNote" value="{{ store_settings.promo_price_note }}"
+                                       placeholder="Ej: / Tallas Disponibles, Por unidad..."
+                                       oninput="updatePromoLivePreview()"
+                                       class="w-full px-3.5 py-2.5 text-sm border border-stone-300 rounded-xl bg-[#FAF7F4] focus:bg-white focus:outline-none focus:border-[#8C4A32]">
+                            </div>
+                        </div>
+
+                        <!-- Texto Secundario / Mayoreo / Condición -->
+                        <div>
+                            <label class="block text-xs font-bold text-stone-700 mb-1">
+                                Texto Secundario / Oferta al Mayor / Condición
+                            </label>
+                            <input type="text" id="promoWholesaleNote" value="{{ store_settings.promo_wholesale_note }}"
+                                   placeholder="Ej: Al Mayor: $13,00 (desde 5 uds) | Válido hasta agotar existencias"
+                                   oninput="updatePromoLivePreview()"
+                                   class="w-full px-3.5 py-2.5 text-xs border border-stone-300 rounded-xl bg-[#FAF7F4] focus:bg-white focus:outline-none focus:border-[#8C4A32]">
+                        </div>
+
+                        <!-- Botón y Enlace -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold text-stone-700 mb-1">
+                                    Texto del Botón
+                                </label>
+                                <input type="text" id="promoButtonText" value="{{ store_settings.promo_button_text|default:'Comprar Ahora' }}"
+                                       placeholder="Ej: Comprar Ahora, Ver Oferta, Pedir al Mayor..."
+                                       oninput="updatePromoLivePreview()"
+                                       class="w-full px-3.5 py-2.5 text-xs font-bold border border-stone-300 rounded-xl bg-[#FAF7F4] focus:bg-white focus:outline-none focus:border-[#8C4A32]">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-stone-700 mb-1">
+                                    Enlace Personalizado (Opcional)
+                                </label>
+                                <input type="text" id="promoButtonLink" value="{{ store_settings.promo_button_link }}"
+                                       placeholder="Ej: ?categoria=vestidos o vacío para abrir la prenda"
+                                       class="w-full px-3.5 py-2.5 text-xs border border-stone-300 rounded-xl bg-[#FAF7F4] focus:bg-white focus:outline-none focus:border-[#8C4A32]">
+                            </div>
+                        </div>
+
+                        <!-- Carga Directa de Foto para el Banner -->
+                        <div>
+                            <label class="block text-xs font-bold text-stone-700 mb-1.5">
+                                Foto del Banner Publicitario
+                            </label>
+
+                            <!-- Dropzone de Subida -->
+                            <div id="promoUploadBoxEmpty"
+                                 onclick="document.getElementById('promoImageInput').click()"
+                                 class="cursor-pointer border-2 border-dashed border-stone-300 hover:border-[#8C4A32] bg-[#FAF7F4] hover:bg-white rounded-2xl p-5 text-center transition group">
+                                <div class="w-10 h-10 rounded-full bg-stone-200 group-hover:bg-[#8C4A32] group-hover:text-white text-stone-600 mx-auto flex items-center justify-center text-lg transition mb-1.5">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                </div>
+                                <p class="text-xs font-bold text-stone-700 group-hover:text-[#8C4A32]">
+                                    Toca aquí para subir una foto desde tu teléfono o computadora
+                                </p>
+                                <p class="text-[10px] text-stone-400 mt-0.5">
+                                    Recomendado: foto atractiva vertical u horizontal (se optimiza automáticamente a WebP)
+                                </p>
+                                <div id="promoUploadSpinner" class="hidden mt-2 items-center justify-center gap-2 text-xs font-bold text-[#8C4A32]">
+                                    <i class="fa-solid fa-circle-notch fa-spin"></i> Subiendo imagen...
+                                </div>
+                            </div>
+
+                            <!-- Estado con Imagen -->
+                            <div id="promoUploadBoxFilled" class="hidden p-3.5 rounded-2xl border border-stone-200 bg-[#FAF7F4] items-center justify-between">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <img id="promoUploadedThumb" src="" alt="Banner" class="w-14 h-14 rounded-xl object-cover border border-stone-300 shrink-0">
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-bold text-[#1E1B18] truncate">Foto activa</span>
+                                            <span class="px-2 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-extrabold uppercase">WebP</span>
+                                        </div>
+                                        <p class="text-[11px] text-stone-400 mt-0.5">Se mostrará con recorte moderno a la derecha del banner</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <button type="button" onclick="document.getElementById('promoImageInput').click()"
+                                            class="px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 border border-stone-300 text-stone-700 text-xs font-bold transition flex items-center gap-1.5">
+                                        <i class="fa-solid fa-arrows-rotate"></i> Cambiar
+                                    </button>
+                                    <button type="button" onclick="removePromoImage()"
+                                            class="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold transition" title="Quitar foto">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Columna Derecha: Vista Previa 1:1 en Vivo -->
+                    <div class="lg:col-span-6 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-extrabold text-stone-700 flex items-center gap-1.5 uppercase tracking-wider">
+                                <i class="fa-solid fa-eye text-[#8C4A32]"></i> Vista Previa en Vivo (Así se verá en Portada)
+                            </span>
+                            <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                                Actualización en tiempo real
+                            </span>
+                        </div>
+
+                        <!-- Card 1:1 Idéntica a la Portada -->
+                        <div class="dark-grid-surface rounded-[28px] p-6 text-white relative overflow-hidden flex flex-col justify-between min-h-[260px] shadow-lg border border-stone-800">
+                            <div class="relative z-10 max-w-[58%]">
+                                <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur-xs px-3 py-1 rounded-full mb-3 border border-white/15">
+                                    <img src="{% static 'img/shibui_logo.png' %}" alt="Logo" class="w-4 h-4 rounded-full bg-white object-contain">
+                                    <span id="prevBadge" class="text-[10px] font-bold uppercase tracking-widest text-zinc-200">
+                                        {{ store_settings.promo_badge|default:"COLECCIÓN DESTACADA" }}
+                                    </span>
+                                </div>
+
+                                <h3 id="prevTitle" class="text-xl sm:text-2xl font-extrabold leading-tight tracking-tight">
+                                    {{ store_settings.promo_title|default:"Body Manga Larga Escote en V" }}
+                                </h3>
+
+                                <div class="mt-2 flex flex-wrap items-baseline gap-2">
+                                    <span id="prevPrice" class="text-xl font-extrabold text-white">
+                                        {{ store_settings.promo_price|default:"$19" }}
+                                    </span>
+                                    <span id="prevPriceNote" class="text-xs text-zinc-400">
+                                        {{ store_settings.promo_price_note|default:"/ Tallas Disponibles" }}
+                                    </span>
+                                </div>
+
+                                <p id="prevWholesale" class="text-xs text-zinc-300 mt-1 font-medium leading-snug">
+                                    {{ store_settings.promo_wholesale_note|default:"Al Mayor: $13,00 (desde 5 uds)" }}
+                                </p>
+
+                                <div class="mt-4 flex items-center gap-2">
+                                    <button type="button" id="prevButtonText"
+                                            class="px-4 py-2 rounded-full bg-white text-[#141414] font-extrabold text-xs tracking-wide shadow">
+                                        {{ store_settings.promo_button_text|default:"Comprar Ahora" }}
+                                    </button>
+                                    <span class="text-[10px] text-zinc-400">Ver detalles →</span>
+                                </div>
+                            </div>
+
+                            <!-- Imagen Recortada en Vista Previa -->
+                            <div class="absolute right-0 top-0 bottom-0 w-[44%] overflow-hidden">
+                                <img id="prevImg"
+                                     src="{{ store_settings.promo_image_url }}"
+                                     alt="Vista previa"
+                                     class="w-full h-full object-cover object-center opacity-95"
+                                     style="mask-image: linear-gradient(to right, transparent 0%, black 22%); -webkit-mask-image: linear-gradient(to right, transparent 0%, black 22%);">
+                            </div>
+                        </div>
+
+                        <!-- Botón de Guardado Prominente -->
+                        <div class="pt-2">
+                            <button type="submit" id="promoSubmitBtn"
+                                    class="w-full py-3.5 px-5 rounded-xl bg-[#1E1B18] hover:bg-[#8C4A32] text-white text-sm font-extrabold transition shadow-md flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-floppy-disk"></i>
+                                <span>Guardar Banner Publicitario</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <!-- TAB: GESTIÓN DE CATEGORÍAS E IMÁGENES DE LA TIENDA PRINCIPAL -->
+    <section id="tabPanel-categories" class="hidden space-y-6">
+        <!-- Banner Explicativo -->
+        <div class="bg-gradient-to-r from-[#1E1B18] via-[#2d2925] to-[#453e38] text-white rounded-2xl p-6 shadow-sm border border-stone-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-xs font-semibold text-stone-200 mb-2.5">
+                    <i class="fa-solid fa-image text-[#e89d84]"></i> Tienda Principal y Círculos de Categorías
+                </div>
+                <h2 class="text-xl font-extrabold tracking-tight">Categorías e Imágenes del Catálogo</h2>
+                <p class="text-xs text-stone-300 mt-1 max-w-2xl leading-relaxed">
+                    Crea tus categorías y sube una foto o imagen directa desde tu teléfono o computadora para el círculo de cada sección. Sin códigos ni configuraciones difíciles: la imagen se convierte automáticamente a WebP optimizado para máxima velocidad de carga.
+                </p>
+            </div>
+            <div class="flex items-center gap-3 shrink-0">
+                <a href="{% url 'catalog:index' %}" target="_blank"
+                   class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold transition flex items-center gap-2">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Ver Tienda en Vivo
+                </a>
+            </div>
+        </div>
+
+        <!-- Formulario con Carga Directa de Imagen y Vista Previa -->
+        <div id="catFormCard" class="bg-white rounded-2xl border border-[#E5E0D8] p-5 sm:p-6 shadow-xs scroll-mt-6">
+            <div class="border-b border-stone-100 pb-3 mb-5 flex items-center justify-between">
+                <div>
+                    <h3 id="catFormHeaderTitle" class="text-base font-extrabold text-[#1E1B18] flex items-center gap-2">
+                        <i class="fa-solid fa-circle-plus text-[#8C4A32]"></i> Agregar Nueva Categoría
+                    </h3>
+                    <p class="text-xs text-stone-500 mt-0.5">Ingresa el nombre, sube la imagen que quieras usar como ícono y mira la vista previa en vivo.</p>
+                </div>
+                <button type="button" id="catFormCancelBtn" onclick="resetCategoryForm()" class="hidden px-3.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-xmark"></i> Cancelar Edición
+                </button>
+            </div>
+
+            <form id="categoryFullForm" onsubmit="saveCustomCategoryWithImage(event)" class="space-y-6">
+                <input type="hidden" id="cfgCatId" value="">
+                <input type="hidden" id="cfgCatImageUrl" value="">
+                <input type="file" id="cfgCatImageInput" accept="image/*" class="hidden" onchange="handleCatImageFile(event)">
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    <!-- Columna Izquierda: Datos y Carga de Foto -->
+                    <div class="lg:col-span-8 space-y-5">
+                        <div>
+                            <label class="block text-xs font-bold text-stone-700 mb-1">
+                                Nombre de la Categoría <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="cfgCatName" required
+                                   placeholder="Ej: Vestidos, Conjuntos, Blusas, Faldas, Pantalones, Accesorios..."
+                                   oninput="updateCategoryLivePreview()"
+                                   class="w-full px-3.5 py-2.5 text-sm border border-stone-300 rounded-xl bg-[#FAF7F4] focus:bg-white focus:outline-none focus:border-[#8C4A32]">
+                        </div>
+
+                        <!-- Área de Carga Directa de Imagen desde el Dispositivo -->
+                        <div>
+                            <label class="block text-xs font-bold text-stone-700 mb-1.5">
+                                Imagen o Foto para el Círculo de la Categoría
+                            </label>
+
+                            <!-- Estado 1: Sin Imagen Cargada (Dropzone para hacer clic) -->
+                            <div id="catUploadBoxEmpty"
+                                 onclick="document.getElementById('cfgCatImageInput').click()"
+                                 class="cursor-pointer border-2 border-dashed border-stone-300 hover:border-[#8C4A32] bg-[#FAF7F4] hover:bg-white rounded-2xl p-6 text-center transition group">
+                                <div class="w-12 h-12 rounded-full bg-stone-200 group-hover:bg-[#8C4A32] group-hover:text-white text-stone-600 mx-auto flex items-center justify-center text-xl transition mb-2">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                </div>
+                                <p class="text-xs font-bold text-stone-700 group-hover:text-[#8C4A32]">
+                                    Toca aquí para seleccionar una imagen desde tu teléfono o computadora
+                                </p>
+                                <p class="text-[11px] text-stone-400 mt-1 max-w-md mx-auto">
+                                    Sube cualquier foto de prenda, logo o ícono gráfico (JPG, PNG, WebP). Se convertirá automáticamente a formato WebP ligero.
+                                </p>
+                                <div id="catUploadSpinner" class="hidden mt-3 items-center justify-center gap-2 text-xs font-bold text-[#8C4A32]">
+                                    <i class="fa-solid fa-circle-notch fa-spin"></i> Subiendo y optimizando a WebP...
+                                </div>
+                            </div>
+
+                            <!-- Estado 2: Con Imagen Cargada (Miniatura con botones Cambiar / Quitar) -->
+                            <div id="catUploadBoxFilled" class="hidden p-4 rounded-2xl border border-stone-200 bg-[#FAF7F4] items-center justify-between">
+                                <div class="flex items-center gap-3.5 min-w-0">
+                                    <div class="w-14 h-14 rounded-full border-2 border-[#8C4A32] bg-white overflow-hidden shrink-0 shadow-xs">
+                                        <img id="catUploadedThumb" src="" alt="Ícono de categoría" class="w-full h-full object-cover">
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-bold text-[#1E1B18] truncate">Imagen seleccionada</span>
+                                            <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-extrabold uppercase">WebP</span>
+                                        </div>
+                                        <p class="text-[11px] text-stone-500 mt-0.5">Lista para mostrarse en la página de inicio</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <button type="button" onclick="document.getElementById('cfgCatImageInput').click()"
+                                            class="px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 border border-stone-300 text-stone-700 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs">
+                                        <i class="fa-solid fa-arrows-rotate"></i> Cambiar
+                                    </button>
+                                    <button type="button" onclick="removeCatImage()"
+                                            class="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold transition" title="Quitar imagen">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-stone-700 mb-1">
+                                Descripción Breve (Opcional)
+                            </label>
+                            <input type="text" id="cfgCatDescription"
+                                   placeholder="Detalles sobre prendas o confección de esta categoría..."
+                                   class="w-full px-3.5 py-2 text-xs border border-stone-300 rounded-xl bg-[#FAF7F4] focus:bg-white focus:outline-none focus:border-[#8C4A32]">
+                        </div>
+                    </div>
+
+                    <!-- Columna Derecha: Vista Previa en Vivo de la Tienda Principal -->
+                    <div class="lg:col-span-4 bg-[#FAF7F4] border border-stone-200/90 rounded-2xl p-5 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[11px] font-extrabold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-eye text-[#8C4A32]"></i> Vista Previa en Vivo
+                                </span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                                    Página Principal
+                                </span>
+                            </div>
+
+                            <p class="text-xs text-stone-500 mb-4 leading-relaxed">
+                                Así verán tus clientes el círculo en la barra superior de la tienda:
+                            </p>
+
+                            <!-- Comparación: Estado Normal vs Estado Activo -->
+                            <div class="grid grid-cols-2 gap-3 p-4 bg-white rounded-xl border border-stone-200/80 shadow-2xs">
+                                <!-- Estado Normal -->
+                                <div class="flex flex-col items-center text-center">
+                                    <div id="previewNormalIconCircle" class="w-14 h-14 rounded-full border border-stone-200 bg-[#F7F7F7] overflow-hidden flex items-center justify-center shadow-2xs transition">
+                                        <span id="previewFallbackNormal" class="text-xs font-extrabold text-stone-500 uppercase">CA</span>
+                                        <img id="previewImgNormal" src="" alt="" class="hidden w-full h-full object-cover p-0.5 rounded-full">
+                                    </div>
+                                    <span id="previewNormalName" class="text-xs font-semibold text-zinc-700 mt-2 truncate max-w-full">
+                                        Categoría
+                                    </span>
+                                    <span class="text-[10px] text-stone-400 mt-0.5">Normal</span>
+                                </div>
+
+                                <!-- Estado Activo (Clic del cliente) -->
+                                <div class="flex flex-col items-center text-center border-l border-stone-100 pl-3">
+                                    <div id="previewActiveIconCircle" class="w-14 h-14 rounded-full border-2 border-[#2B2B2B] bg-[#2B2B2B] overflow-hidden flex items-center justify-center shadow-md transition">
+                                        <span id="previewFallbackActive" class="text-xs font-extrabold text-white uppercase">CA</span>
+                                        <img id="previewImgActive" src="" alt="" class="hidden w-full h-full object-cover p-0.5 rounded-full">
+                                    </div>
+                                    <span id="previewActiveName" class="text-xs font-bold text-[#141414] mt-2 truncate max-w-full">
+                                        Categoría
+                                    </span>
+                                    <span class="text-[10px] text-stone-400 mt-0.5">Seleccionado</span>
+                                </div>
+                            </div>
+
+                            <p class="text-[11px] text-stone-400 mt-3 text-center">
+                                Al hacer clic en la tienda, filtra al instante las prendas de esta sección.
+                            </p>
+                        </div>
+
+                        <div class="mt-5 pt-4 border-t border-stone-200">
+                            <button type="submit" id="catSubmitBtn"
+                                    class="w-full py-2.5 px-4 rounded-xl bg-[#1E1B18] hover:bg-[#8C4A32] text-white text-xs font-bold transition shadow flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-check"></i>
+                                <span id="catSubmitBtnText">Guardar Categoría</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Listado de Categorías Registradas -->
+        <div class="bg-white rounded-2xl border border-[#E5E0D8] p-5 sm:p-6 shadow-xs">
+            <div class="flex items-center justify-between border-b border-stone-100 pb-3 mb-4">
+                <div>
+                    <h3 class="text-base font-extrabold text-[#1E1B18] flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-[#8C4A32]"></i> Categorías en la Tienda Principal
+                    </h3>
+                    <p class="text-xs text-stone-500 mt-0.5">Secciones con sus imágenes visibles en la cabecera de la tienda.</p>
+                </div>
+                <span class="px-3 py-1 rounded-full bg-[#FAF7F4] border border-[#E5E0D8] text-xs font-bold text-[#1E1B18]">
+                    {{ categories|length }} categorías
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {% for cat in categories %}
+                <div class="p-3.5 rounded-xl border border-stone-200 hover:border-[#8C4A32] transition bg-[#FAF7F4] hover:bg-white flex items-center justify-between group shadow-2xs">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <!-- Círculo con Imagen estilo Tienda Principal -->
+                        <div class="w-12 h-12 rounded-full border border-stone-200 bg-white group-hover:border-[#2B2B2B] flex items-center justify-center overflow-hidden shadow-2xs shrink-0 transition">
+                            {% if cat.get_image_url %}
+                                <img src="{{ cat.get_image_url }}" alt="{{ cat.name }}" class="w-full h-full object-cover rounded-full p-0.5">
+                            {% else %}
+                                <span class="text-xs font-extrabold text-stone-500 uppercase">{{ cat.name|slice:":2" }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-bold text-[#1E1B18] truncate">{{ cat.name }}</p>
+                            <span class="inline-block mt-0.5 text-[10px] font-semibold px-2 py-0.2 rounded-full bg-stone-200/70 text-stone-700">
+                                {{ cat.prod_count|default:0 }} prenda(s)
+                            </span>
+                            {% if cat.image_url %}
+                            <span class="inline-block mt-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">Foto Propia</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 shrink-0 ml-2">
+                        <button type="button"
+                                onclick="editCategoryWithImage({{ cat.id }}, '{{ cat.name|escapejs }}', '{{ cat.image_url|default:''|escapejs }}', '{{ cat.description|default:''|escapejs }}')"
+                                title="Editar categoría y cambiar imagen"
+                                class="px-2.5 py-1.5 rounded-lg bg-stone-200/80 hover:bg-[#1E1B18] hover:text-white text-xs font-bold transition">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <a href="{% url 'catalog:index' %}?categoria={{ cat.slug }}" target="_blank"
+                           title="Ver categoría en la tienda principal"
+                           class="px-2.5 py-1.5 rounded-lg bg-stone-200/80 hover:bg-stone-300 text-stone-700 text-xs font-bold transition">
+                            <i class="fa-solid fa-eye"></i>
+                        </a>
+                        <button type="button"
+                                onclick="deleteCustomCategory({{ cat.id }}, '{{ cat.name|escapejs }}')"
+                                title="Eliminar categoría"
+                                class="px-2 py-1.5 rounded-lg text-red-600 hover:bg-red-50 text-xs font-bold transition">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-span-full py-8 text-center text-stone-400 text-xs">
+                    No hay categorías registradas. Agrega una nueva arriba.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- TAB: GESTIÓN PERSONALIZADA DE COLORES Y TALLAS -->
+    <section id="tabPanel-attributes" class="hidden space-y-6">
+        <!-- Banner explicativo -->
+        <div class="bg-[#FAF7F4] border border-[#E5E0D8] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+                <h2 class="text-base font-extrabold text-[#1E1B18] flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-[#8C4A32]"></i>
+                    Configuración Libre de Colores, Tallas y Categorías
+                </h2>
+                <p class="text-xs sm:text-sm text-stone-600 mt-0.5">
+                    Nada está fijo en el sistema: aquí puedes agregar nuevos colores con selector visual, crear tallas personalizadas (letras, números o talla única), editar los existentes o eliminar los que no uses.
+                </p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- BLOQUE 1: GESTIÓN DE COLORES -->
+            <div class="bg-white rounded-2xl border border-[#E5E0D8] p-5 sm:p-6 shadow-xs flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between border-b border-stone-100 pb-3 mb-4">
+                        <div>
+                            <h3 class="text-base font-extrabold text-[#1E1B18] flex items-center gap-2">
+                                <i class="fa-solid fa-palette text-[#8C4A32]"></i> Colores del Catálogo
+                            </h3>
+                            <p class="text-xs text-stone-500 mt-0.5">Elige cualquier tono en el selector y asígnale el nombre que desees.</p>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-full bg-[#FAF7F4] border border-[#E5E0D8] text-xs font-bold text-[#1E1B18]">
+                            {{ colors|length }} activos
+                        </span>
+                    </div>
+
+                    <!-- Formulario Crear / Editar Color -->
+                    <form id="colorConfigForm" onsubmit="saveCustomColor(event)" class="bg-[#FAF7F4] p-4 rounded-xl border border-[#E5E0D8] mb-5 space-y-3">
+                        <input type="hidden" id="cfgColorId" value="">
+                        <div class="flex items-center justify-between">
+                            <span id="cfgColorFormTitle" class="text-xs font-bold uppercase tracking-wider text-[#8C4A32]">
+                                + Agregar Nuevo Color
+                            </span>
+                            <button type="button" id="cfgColorCancelBtn" onclick="resetColorForm()" class="hidden text-xs text-stone-500 hover:text-stone-800 underline">
+                                Cancelar edición
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                            <div class="sm:col-span-6">
+                                <label class="block text-xs font-semibold text-stone-700 mb-1">Nombre del Color *</label>
+                                <input type="text" id="cfgColorName" required placeholder="Ej: Verde Esmeralda, Lila..."
+                                       class="w-full px-3.5 py-2 text-sm border border-stone-300 rounded-xl bg-white focus:outline-none focus:border-[#8C4A32]">
+                            </div>
+                            <div class="sm:col-span-3">
+                                <label class="block text-xs font-semibold text-stone-700 mb-1">Tono / Color *</label>
+                                <div class="flex items-center gap-2 bg-white border border-stone-300 rounded-xl px-2.5 py-1.5">
+                                    <input type="color" id="cfgColorPicker" value="#8C4A32"
+                                           oninput="document.getElementById('cfgColorHex').value = this.value.toUpperCase()"
+                                           class="w-7 h-7 rounded cursor-pointer border-0 bg-transparent p-0">
+                                    <input type="text" id="cfgColorHex" value="#8C4A32" maxlength="7"
+                                           oninput="if(/^#[0-9A-Fa-f]{6}$/.test(this.value)) document.getElementById('cfgColorPicker').value = this.value"
+                                           class="w-full text-xs font-mono font-bold text-stone-700 focus:outline-none uppercase">
+                                </div>
+                            </div>
+                            <div class="sm:col-span-3">
+                                <button type="submit" id="cfgColorSubmitBtn"
+                                        class="w-full py-2.5 px-3 rounded-xl bg-[#1E1B18] hover:bg-[#8C4A32] text-white text-xs font-bold transition shadow">
+                                    Guardar Color
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Lista de Colores Actuales -->
+                    <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
+                        {% for c in colors %}
+                        <div class="flex items-center justify-between p-2.5 rounded-xl border border-stone-200 hover:border-[#8C4A32]/50 hover:bg-[#FAF7F4]/50 transition">
+                            <div class="flex items-center gap-3">
+                                <span class="w-7 h-7 rounded-full border border-black/20 shadow-2xs shrink-0" style="background-color: {{ c.hex_code }};"></span>
+                                <div>
+                                    <p class="text-sm font-bold text-[#1E1B18] leading-tight">{{ c.name }}</p>
+                                    <p class="text-[11px] font-mono text-stone-400 uppercase">{{ c.hex_code }}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" onclick="editCustomColor({{ c.id }}, '{{ c.name|escapejs }}', '{{ c.hex_code|escapejs }}')"
+                                        class="px-2.5 py-1.5 rounded-lg bg-stone-100 hover:bg-[#1E1B18] hover:text-white text-stone-700 text-xs font-semibold transition">
+                                    <i class="fa-solid fa-pen text-[10px] mr-1"></i> Editar
+                                </button>
+                                <button type="button" onclick="deleteCustomColor({{ c.id }}, '{{ c.name|escapejs }}')"
+                                        class="px-2.5 py-1.5 rounded-lg text-red-600 hover:bg-red-50 text-xs transition" title="Eliminar color">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-xs text-stone-500 text-center py-6">No hay colores registrados. Agrega el primero arriba.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- BLOQUE 2: GESTIÓN DE TALLAS -->
+            <div class="bg-white rounded-2xl border border-[#E5E0D8] p-5 sm:p-6 shadow-xs flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between border-b border-stone-100 pb-3 mb-4">
+                        <div>
+                            <h3 class="text-base font-extrabold text-[#1E1B18] flex items-center gap-2">
+                                <i class="fa-solid fa-ruler-combined text-[#8C4A32]"></i> Tallas del Catálogo
+                            </h3>
+                            <p class="text-xs text-stone-500 mt-0.5">Define tallas por letras (XS, S, M, XXL), números (28, 30, 32) o Talla Única.</p>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-full bg-[#FAF7F4] border border-[#E5E0D8] text-xs font-bold text-[#1E1B18]">
+                            {{ sizes|length }} activas
+                        </span>
+                    </div>
+
+                    <!-- Formulario Crear / Editar Talla -->
+                    <form id="sizeConfigForm" onsubmit="saveCustomSize(event)" class="bg-[#FAF7F4] p-4 rounded-xl border border-[#E5E0D8] mb-4 space-y-3">
+                        <input type="hidden" id="cfgSizeId" value="">
+                        <div class="flex items-center justify-between">
+                            <span id="cfgSizeFormTitle" class="text-xs font-bold uppercase tracking-wider text-[#8C4A32]">
+                                + Agregar Nueva Talla
+                            </span>
+                            <button type="button" id="cfgSizeCancelBtn" onclick="resetSizeForm()" class="hidden text-xs text-stone-500 hover:text-stone-800 underline">
+                                Cancelar edición
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                            <div class="sm:col-span-6">
+                                <label class="block text-xs font-semibold text-stone-700 mb-1">Nombre de la Talla *</label>
+                                <input type="text" id="cfgSizeName" required placeholder="Ej: XXL, XXS, 28, 30, Plus, Única..."
+                                       class="w-full px-3.5 py-2 text-sm border border-stone-300 rounded-xl bg-white focus:outline-none focus:border-[#8C4A32]">
+                            </div>
+                            <div class="sm:col-span-3">
+                                <label class="block text-xs font-semibold text-stone-700 mb-1">Orden</label>
+                                <input type="number" id="cfgSizeOrder" placeholder="Auto" min="1" max="99"
+                                       class="w-full px-3 py-2 text-sm border border-stone-300 rounded-xl bg-white focus:outline-none focus:border-[#8C4A32]">
+                            </div>
+                            <div class="sm:col-span-3">
+                                <button type="submit" id="cfgSizeSubmitBtn"
+                                        class="w-full py-2.5 px-3 rounded-xl bg-[#1E1B18] hover:bg-[#8C4A32] text-white text-xs font-bold transition shadow">
+                                    Guardar Talla
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Botones rápidos de sugerencia -->
+                        <div class="pt-1 flex flex-wrap items-center gap-1.5">
+                            <span class="text-[11px] text-stone-500 mr-1">Agregar rápido:</span>
+                            <button type="button" onclick="quickAddSize('XXS')" class="px-2 py-0.5 rounded bg-white border border-stone-300 hover:border-[#8C4A32] text-[11px] font-bold text-stone-700">+ XXS</button>
+                            <button type="button" onclick="quickAddSize('XXL')" class="px-2 py-0.5 rounded bg-white border border-stone-300 hover:border-[#8C4A32] text-[11px] font-bold text-stone-700">+ XXL</button>
+                            <button type="button" onclick="quickAddSize('Plus')" class="px-2 py-0.5 rounded bg-white border border-stone-300 hover:border-[#8C4A32] text-[11px] font-bold text-stone-700">+ Plus</button>
+                            <button type="button" onclick="quickAddSize('28')" class="px-2 py-0.5 rounded bg-white border border-stone-300 hover:border-[#8C4A32] text-[11px] font-bold text-stone-700">+ 28</button>
+                            <button type="button" onclick="quickAddSize('30')" class="px-2 py-0.5 rounded bg-white border border-stone-300 hover:border-[#8C4A32] text-[11px] font-bold text-stone-700">+ 30</button>
+                            <button type="button" onclick="quickAddSize('32')" class="px-2 py-0.5 rounded bg-white border border-stone-300 hover:border-[#8C4A32] text-[11px] font-bold text-stone-700">+ 32</button>
+                            <button type="button" onclick="quickAddSize('34')" class="px-2 py-0.5 rounded bg-white border border-stone-300 hover:border-[#8C4A32] text-[11px] font-bold text-stone-700">+ 34</button>
+                        </div>
+                    </form>
+
+                    <!-- Lista de Tallas Actuales -->
+                    <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                        {% for s in sizes %}
+                        <div class="flex items-center justify-between p-2.5 rounded-xl border border-stone-200 hover:border-[#8C4A32]/50 hover:bg-[#FAF7F4]/50 transition">
+                            <div class="flex items-center gap-3">
+                                <span class="min-w-10 h-8 px-2.5 rounded-lg bg-[#1E1B18] text-white text-xs font-extrabold flex items-center justify-center">
+                                    {{ s.name }}
+                                </span>
+                                <div>
+                                    <p class="text-sm font-bold text-[#1E1B18]">Talla {{ s.name }}</p>
+                                    <p class="text-[11px] text-stone-400">Posición de orden: #{{ s.order }}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" onclick="editCustomSize({{ s.id }}, '{{ s.name|escapejs }}', {{ s.order }})"
+                                        class="px-2.5 py-1.5 rounded-lg bg-stone-100 hover:bg-[#1E1B18] hover:text-white text-stone-700 text-xs font-semibold transition">
+                                    <i class="fa-solid fa-pen text-[10px] mr-1"></i> Editar
+                                </button>
+                                <button type="button" onclick="deleteCustomSize({{ s.id }}, '{{ s.name|escapejs }}')"
+                                        class="px-2.5 py-1.5 rounded-lg text-red-600 hover:bg-red-50 text-xs transition" title="Eliminar talla">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-xs text-stone-500 text-center py-6">No hay tallas registradas. Agrega la primera arriba.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ENLACE DIRECTO A CATEGORÍAS E ÍCONOS -->
+        <div class="bg-gradient-to-r from-[#1E1B18] to-[#3a3530] text-white rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3.5">
+                <div class="w-12 h-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-xl text-[#e89d84] shrink-0">
+                    <i class="fa-solid fa-tags"></i>
+                </div>
+                <div>
+                    <h4 class="text-sm font-bold">Gestión de Categorías e Íconos de la Tienda</h4>
+                    <p class="text-xs text-stone-300 mt-0.5">Configura cómo se mostrarán los círculos de categorías en la página principal con selector visual de íconos.</p>
+                </div>
+            </div>
+            <button type="button" onclick="switchAdminTab('categories')"
+                    class="px-5 py-2.5 rounded-xl bg-[#8C4A32] hover:bg-[#a1563b] text-white text-xs font-bold transition flex items-center justify-center gap-2 self-start sm:self-auto shrink-0 shadow">
+                Gestionar Categorías e Íconos <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </button>
+        </div>
+    </section>
+
+    <!-- TAB 2: PEDIDOS -->
+    <section id="tabPanel-orders" class="hidden space-y-4">
+        {% if orders %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for o in orders %}
+            <div class="bg-white rounded-2xl border border-[#E5E0D8] p-5 shadow-xs flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between border-b border-stone-100 pb-3 mb-3">
+                        <div>
+                            <span class="text-xs font-bold text-[#8C4A32] bg-[#FAF7F4] px-2.5 py-1 rounded-full border border-[#E5E0D8]">
+                                #{{ o.order_number }}
+                            </span>
+                            <span class="text-xs text-stone-400 ml-2">{{ o.created_at|date:"d/m/Y H:i" }}</span>
+                        </div>
+                        <select onchange="updateOrderStatus({{ o.id }}, this.value)"
+                                class="text-xs font-bold px-3 py-1 rounded-full border border-stone-300 bg-[#FAF7F4] focus:outline-none focus:border-[#8C4A32]">
+                            <option value="Pendiente" {% if o.status == 'Pendiente' %}selected{% endif %}>⏳ Pendiente</option>
+                            <option value="Confirmado" {% if o.status == 'Confirmado' %}selected{% endif %}>✅ Confirmado</option>
+                            <option value="Enviado" {% if o.status == 'Enviado' %}selected{% endif %}>🚚 Enviado</option>
+                            <option value="Entregado" {% if o.status == 'Entregado' %}selected{% endif %}>🎉 Entregado</option>
+                            <option value="Cancelado" {% if o.status == 'Cancelado' %}selected{% endif %}>❌ Cancelado</option>
+                        </select>
+                    </div>
+
+                    <p class="font-bold text-[#1E1B18] text-base">{{ o.customer_name }}</p>
+                    <p class="text-xs text-stone-600 mt-0.5"><i class="fa-solid fa-phone mr-1 text-[#8C4A32]"></i> {{ o.customer_phone }} · {{ o.customer_city }}</p>
+                    <p class="text-xs text-stone-500 mt-0.5"><i class="fa-solid fa-location-dot mr-1 text-[#8C4A32]"></i> {{ o.customer_address }} ({{ o.payment_method }})</p>
+                    {% if o.notes %}
+                    <p class="text-[11px] text-stone-500 bg-[#FAF7F4] px-2.5 py-1.5 rounded-lg mt-2">{{ o.notes }}</p>
+                    {% endif %}
+
+                    <div class="mt-3 pt-3 border-t border-stone-100 space-y-1.5">
+                        {% for item in o.items.all %}
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-stone-800">
+                                <strong>{{ item.quantity }}x</strong> {{ item.product_name }}
+                                <span class="text-stone-500">(Talla {{ item.size_name }}, {{ item.color_name }})</span>
+                            </span>
+                            <span class="font-semibold text-[#1E1B18]">
+                                {{ store_settings.currency_symbol }}{{ item.subtotal|floatformat:2 }}
+                                {% if item.is_wholesale_applied %}
+                                <span class="text-[10px] text-[#8C4A32] font-bold">[Mayor]</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-stone-200 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs text-stone-500 block">{{ o.total_units }} prendas ({{ o.get_order_type_display }})</span>
+                        <span class="text-lg font-extrabold text-[#1E1B18]">Total: {{ store_settings.currency_symbol }}{{ o.total|floatformat:2 }} USD</span>
+                    </div>
+                    <a href="https://wa.me/{{ o.customer_phone|cut:'+'|cut:' '|cut:'-' }}?text=Hola%20{{ o.customer_name|urlencode }}%2C%20te%20escribimos%20de%20{{ store_settings.store_name|urlencode }}%20sobre%20tu%20orden%20%23{{ o.order_number }}"
+                       target="_blank"
+                       class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition inline-flex items-center gap-1.5">
+                        <i class="fa-brands fa-whatsapp"></i> Contactar Comprador
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-12 text-center bg-[#FAF7F4] rounded-2xl">
+            <p class="text-sm text-stone-600">Aún no hay pedidos registrados.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- TAB 3: CONFIGURACIÓN -->
+    <section id="tabPanel-settings" class="hidden">
+        <form onsubmit="saveStoreSettings(event)" class="bg-white rounded-2xl border border-[#E5E0D8] p-6 max-w-2xl space-y-4">
+            <h3 class="text-base font-bold text-[#1E1B18] border-b border-stone-100 pb-2">Configuración General de la Tienda</h3>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-stone-700 mb-1">Nombre de la Tienda</label>
+                    <input type="text" id="setStoreName" value="{{ store_settings.store_name }}" required
+                           class="w-full px-3.5 py-2 text-sm border border-stone-300 rounded-xl">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-stone-700 mb-1">Ubicación / Ciudad</label>
+                    <input type="text" id="setStoreLocation" value="{{ store_settings.store_location }}" required
+                           class="w-full px-3.5 py-2 text-sm border border-stone-300 rounded-xl">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-stone-700 mb-1">
+                    <i class="fa-solid fa-location-dot text-[#8C4A32] mr-1"></i> Dirección Física del Negocio / Tienda
+                </label>
+                <input type="text" id="setStoreAddress" value="{{ store_settings.store_address }}"
+                       placeholder="Ej: Av. Principal, C.C. Galerías, Nivel 1, Local #14, Caracas"
+                       class="w-full px-3.5 py-2 text-sm border border-stone-300 rounded-xl">
+                <p class="text-[11px] text-stone-500 mt-1">
+                    Esta dirección se muestra a los compradores para <strong>Retiro Personal</strong>, en el pie de página y en los pedidos por WhatsApp.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-stone-700 mb-1">Responsable / Dueño</label>
+                    <input type="text" id="setOwnerName" value="{{ store_settings.owner_name }}" required
+                           class="w-full px-3.5 py-2 text-sm border border-stone-300 rounded-xl">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-stone-700 mb-1">WhatsApp de Pedidos</label>
+                    <input type="text" id="setOwnerPhone" value="{{ store_settings.owner_phone }}" required
+                           class="w-full px-3.5 py-2 text-sm border border-stone-300 rounded-xl">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-stone-700 mb-1">Tasa Bs. / USD</label>
+                    <input type="number" step="0.01" id="setBcvRate" value="{{ store_settings.bcv_rate|stringformat:'s' }}" required
+                           class="w-full px-3.5 py-2 text-sm border border-stone-300 rounded-xl">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-stone-700 mb-1">Anuncio Superior</label>
+                <input type="text" id="setAnnouncement" value="{{ store_settings.announcement }}"
+                       class="w-full px-3.5 py-2 text-sm border border-stone-300 rounded-xl">
+            </div>
+
+            <div class="p-4 rounded-xl bg-[#FAF7F4] border border-[#E5E0D8] space-y-3">
+                <label class="flex items-center gap-2.5 cursor-pointer">
+                    <input type="checkbox" id="setCombineWholesale" {% if store_settings.combine_wholesale_enabled %}checked{% endif %}
+                           class="w-4 h-4 accent-[#8C4A32]">
+                    <span class="text-xs sm:text-sm font-bold text-[#1E1B18]">Permitir mayoreo surtido combinando prendas distintas</span>
+                </label>
+                <div class="flex items-center gap-3">
+                    <label class="text-xs text-stone-700 font-semibold">Mínimo de piezas surtidas en carrito para activar precio al mayor:</label>
+                    <input type="number" id="setGlobalMinUnits" min="2" max="50" value="{{ store_settings.global_wholesale_min_units }}"
+                           class="w-20 px-3 py-1.5 text-sm font-bold border border-[#8C4A32] rounded-xl text-center">
+                </div>
+            </div>
+
+            <button type="submit" class="px-6 py-3 rounded-xl bg-[#1E1B18] hover:bg-[#8C4A32] text-white text-sm font-bold transition shadow">
+                Guardar Ajustes
+            </button>
+        </form>
+    </section>
+
+</div>
+
+<!-- MODAL AGREGAR / EDITAR PRENDA -->
+<div id="adminProductModal" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl border border-stone-100 my-8">
+        <div class="bg-[#1E1B18] text-white px-6 py-4 flex items-center justify-between">
+            <h3 id="adminModalTitle" class="font-bold text-base">Agregar Nueva Prenda</h3>
+            <button type="button" onclick="closeProductAdminModal()" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
+        </div>
+
+        <form id="adminProductForm" onsubmit="submitAdminProduct(event)" class="p-6 space-y-4 max-h-[82vh] overflow-y-auto">
+            <input type="hidden" id="admProdId" value="">
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-semibold text-stone-700 mb-1">Nombre de la Prenda *</label>
+                    <input type="text" id="admName" required placeholder="Ej: Set Antonella Lino 2 Piezas"
+                           class="w-full px-3.5 py-2 text-sm border border-stone-300 rounded-xl">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-stone-700 mb-1">Categoría *</label>
+                    <select id="admCategory" required class="w-full px-3 py-2 text-sm border border-stone-300 rounded-xl bg-white">
+                        {% for c in categories %}
+                        <option value="{{ c.id }}">{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-[#FAF7F4] border border-[#E5E0D8]">
+                <div>
+                    <label class="block text-xs font-bold text-stone-800 mb-1">Precio al Detal (USD) *</label>
+                    <input type="number" step="0.01" min="0.5" id="admPriceRetail" required placeholder="28.00"
+                           class="w-full px-3 py-2 text-sm font-bold border border-stone-300 rounded-xl bg-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-[#8C4A32] mb-1">Precio al Mayor (USD) *</label>
+                    <input type="number" step="0.01" min="0.5" id="admPriceWholesale" required placeholder="19.50"
+                           class="w-full px-3 py-2 text-sm font-bold border border-[#8C4A32] rounded-xl bg-white text-[#8C4A32]">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-stone-800 mb-1">Mín. Unidades Mayor *</label>
+                    <input type="number" min="2" max="100" id="admWholesaleMin" required value="4"
+                           class="w-full px-3 py-2 text-sm font-bold border border-stone-300 rounded-xl bg-white">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-stone-700 mb-1">Referencia / SKU</label>
+                    <input type="text" id="admSku" placeholder="SET-101"
+                           class="w-full px-3.5 py-2 text-sm border border-stone-300 rounded-xl">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-stone-700 mb-1">Stock Disponible</label>
+                    <input type="number" min="0" id="admStock" value="50"
+                           class="w-full px-3.5 py-2 text-sm border border-stone-300 rounded-xl">
+                </div>
+                <div class="flex items-end pb-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="admImmediate" checked class="w-4 h-4 accent-[#8C4A32]">
+                        <span class="text-xs font-bold text-emerald-700">Entrega Inmediata</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Sección de Carga de Fotografías (Máx 4 Fotos, Conversión Automática a WebP) -->
+            <div class="p-4 rounded-2xl bg-[#FAF7F4] border border-[#E5E0D8] space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                        <label class="block text-xs font-extrabold text-[#1E1B18] flex items-center gap-1.5">
+                            <i class="fa-solid fa-camera text-[#8C4A32]"></i>
+                            <span>Fotografías de la Prenda (Máx. 4 Fotos en la Publicación) *</span>
+                        </label>
+                        <p class="text-[11px] text-stone-500 mt-0.5">
+                            Sube fotos desde tu teléfono o PC. Se convierten <strong>automáticamente a formato WebP optimizado</strong> para no saturar la carga de la página.
+                        </p>
+                    </div>
+                    <span id="admPhotoCountBadge" class="self-start sm:self-auto px-2.5 py-1 rounded-full bg-white border border-[#E5E0D8] text-[11px] font-bold text-[#8C4A32]">
+                        0 / 4 fotos
+                    </span>
+                </div>
+
+                <!-- Input File oculto para subir fotos -->
+                <input type="file" id="admPhotoInput" multiple accept="image/*" class="hidden" onchange="handleAdminPhotoUpload(event)">
+                
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" onclick="document.getElementById('admPhotoInput').click()" id="btnUploadPhotos"
+                            class="px-4 py-2 rounded-xl bg-[#1E1B18] hover:bg-[#8C4A32] text-white text-xs font-bold transition flex items-center gap-2 shadow-xs">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <span>Cargar Fotos desde tu Galería</span>
+                    </button>
+                    <button type="button" onclick="toggleUrlInputFallback()" class="text-xs text-stone-600 hover:text-black underline font-medium">
+                        O pegar enlace URL
+                    </button>
+                    <span id="admUploadSpinner" class="hidden text-xs text-[#8C4A32] font-semibold items-center gap-1.5 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i> Convirtiendo automáticamente a WebP...
+                    </span>
+                </div>
+
+                <!-- Input URL alternativo -->
+                <div id="admUrlFallbackContainer" class="hidden pt-1">
+                    <div class="flex gap-2">
+                        <input type="url" id="admImageUrlInput" placeholder="https://ejemplo.com/prenda.jpg"
+                               class="flex-1 px-3 py-1.5 text-xs border border-stone-300 rounded-xl bg-white focus:outline-none focus:border-[#8C4A32]">
+                        <button type="button" onclick="addPhotoByUrl()" class="px-3.5 py-1.5 rounded-xl bg-stone-200 hover:bg-stone-300 text-xs font-bold text-stone-800">
+                            + Agregar Foto
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tira de Fotos con Scroll Lateral (Máx 4 Slots) -->
+                <div id="admPhotoSlotsGrid" class="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2 pt-1"></div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-stone-700 mb-1">Descripción</label>
+                <textarea id="admDescription" rows="2" placeholder="Detalles de confección, horma y tela..."
+                          class="w-full px-3.5 py-2 text-sm border border-stone-300 rounded-xl"></textarea>
+            </div>
+
+            <!-- Tallas Disponibles + Creación Rápida Inline -->
+            <div class="p-3.5 rounded-xl bg-[#FAF7F4]/70 border border-[#E5E0D8] space-y-2.5">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <label class="block text-xs font-bold uppercase text-stone-700">Tallas Disponibles</label>
+                    <div class="flex items-center gap-1.5">
+                        <input type="text" id="inlineNewSizeName" placeholder="Nueva talla (ej: XXL, 30)"
+                               class="px-2.5 py-1 text-xs border border-stone-300 rounded-lg bg-white w-36 focus:outline-none focus:border-[#8C4A32]">
+                        <button type="button" onclick="createInlineSize()"
+                                class="px-2.5 py-1 rounded-lg bg-[#1E1B18] hover:bg-[#8C4A32] text-white text-[11px] font-bold transition">
+                            + Crear Talla
+                        </button>
+                    </div>
+                </div>
+                <div id="admSizesContainer" class="flex flex-wrap gap-2">
+                    {% for s in sizes %}
+                    <label class="cursor-pointer">
+                        <input type="checkbox" name="admSizes" value="{{ s.id }}" class="peer sr-only" checked>
+                        <span class="px-3 py-1.5 rounded-lg text-xs font-bold border border-stone-300 bg-white text-[#1E1B18] peer-checked:bg-[#1E1B18] peer-checked:text-white transition inline-block">
+                            {{ s.name }}
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Colores Disponibles + Creación Rápida Inline -->
+            <div class="p-3.5 rounded-xl bg-[#FAF7F4]/70 border border-[#E5E0D8] space-y-2.5">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <label class="block text-xs font-bold uppercase text-stone-700">Colores Disponibles</label>
+                    <div class="flex items-center gap-1.5">
+                        <input type="color" id="inlineNewColorHex" value="#8C4A32"
+                               class="w-7 h-7 rounded cursor-pointer border border-stone-300 bg-white p-0.5">
+                        <input type="text" id="inlineNewColorName" placeholder="Nuevo color (ej: Lila)"
+                               class="px-2.5 py-1 text-xs border border-stone-300 rounded-lg bg-white w-36 focus:outline-none focus:border-[#8C4A32]">
+                        <button type="button" onclick="createInlineColor()"
+                                class="px-2.5 py-1 rounded-lg bg-[#1E1B18] hover:bg-[#8C4A32] text-white text-[11px] font-bold transition">
+                            + Crear Color
+                        </button>
+                    </div>
+                </div>
+                <div id="admColorsContainer" class="flex flex-wrap gap-2">
+                    {% for c in colors %}
+                    <label class="cursor-pointer">
+                        <input type="checkbox" name="admColors" value="{{ c.id }}" class="peer sr-only">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-stone-300 bg-white peer-checked:border-[#8C4A32] peer-checked:bg-[#FAF7F4] peer-checked:font-bold transition">
+                            <span class="w-3.5 h-3.5 rounded-full border border-black/25" style="background-color: {{ c.hex_code }};"></span>
+                            <span>{{ c.name }}</span>
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="pt-2 flex justify-end gap-2">
+                <button type="button" onclick="closeProductAdminModal()" class="px-4 py-2.5 rounded-xl bg-stone-100 text-stone-700 text-xs font-semibold">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-6 py-2.5 rounded-xl bg-[#1E1B18] hover:bg-[#8C4A32] text-white text-xs font-bold shadow">
+                    Guardar Prenda
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    window.ADMIN_PRODUCTS = {{ products_admin_json|safe }};
+
+    function switchAdminTab(tab) {
+        ['inventory', 'promobanner', 'categories', 'attributes', 'orders', 'settings'].forEach(t => {
+            const panel = document.getElementById('tabPanel-' + t);
+            if (panel) panel.classList.toggle('hidden', t !== tab);
+            const btn = document.getElementById('tabBtn-' + t);
+            if (btn) {
+                if (t === tab) {
+                    btn.className = 'px-5 py-3 text-sm font-bold border-b-2 border-[#8C4A32] text-[#1E1B18] whitespace-nowrap';
+                } else {
+                    btn.className = 'px-5 py-3 text-sm font-medium border-b-2 border-transparent text-stone-500 hover:text-[#1E1B18] whitespace-nowrap';
+                }
+            }
+        });
+    }
+
+    window.ADMIN_MODAL_PHOTOS = [];
+
+    function renderAdminPhotoSlots() {
+        const grid = document.getElementById('admPhotoSlotsGrid');
+        const badge = document.getElementById('admPhotoCountBadge');
+        if (!grid) return;
+
+        const count = window.ADMIN_MODAL_PHOTOS.length;
+        if (badge) badge.textContent = `${count} / 4 fotos`;
+
+        let html = '';
+        for (let i = 0; i < 4; i++) {
+            const photoUrl = window.ADMIN_MODAL_PHOTOS[i];
+            if (photoUrl) {
+                html += `
+                    <div class="relative group rounded-xl overflow-hidden border-2 ${i === 0 ? 'border-[#8C4A32]' : 'border-stone-300'} bg-white w-28 sm:w-32 shrink-0 aspect-[4/5] flex flex-col justify-between shadow-2xs">
+                        <img src="${photoUrl}" alt="Foto ${i+1}" class="w-full h-full object-cover">
+                        <div class="absolute top-1.5 left-1.5 flex flex-col gap-1 items-start">
+                            <span class="px-2 py-0.5 rounded-full text-[9px] font-extrabold text-white ${i === 0 ? 'bg-[#8C4A32]' : 'bg-black/75'}">
+                                ${i === 0 ? '★ Principal' : `Foto #${i+1}`}
+                            </span>
+                            <span class="px-1.5 py-0.2 rounded bg-emerald-700/80 text-white text-[8px] font-bold">
+                                WebP
+                            </span>
+                        </div>
+                        <button type="button" onclick="removeAdminPhoto(${i})"
+                                class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center text-xs shadow-md transition"
+                                title="Eliminar foto">
+                            &times;
+                        </button>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div onclick="document.getElementById('admPhotoInput').click()"
+                         class="cursor-pointer rounded-xl border-2 border-dashed border-stone-300 hover:border-[#8C4A32] bg-[#FAF7F4] hover:bg-white w-28 sm:w-32 shrink-0 aspect-[4/5] flex flex-col items-center justify-center p-2.5 text-center transition group">
+                        <div class="w-8 h-8 rounded-full bg-stone-200 group-hover:bg-[#8C4A32] group-hover:text-white text-stone-600 flex items-center justify-center text-xs font-bold transition mb-1">
+                            +
+                        </div>
+                        <span class="text-[10px] font-bold text-stone-600 group-hover:text-[#8C4A32] leading-tight">
+                            ${i === 0 ? 'Foto 1 (Principal)' : `Foto #${i+1}`}
+                        </span>
+                        <span class="text-[9px] text-stone-400 mt-0.5">Espacio libre</span>
+                    </div>
+                `;
+            }
+        }
+        grid.innerHTML = html;
+    }
+
+    async function handleAdminPhotoUpload(event) {
+        const files = event.target.files;
+        if (!files || !files.length) return;
+
+        if (window.ADMIN_MODAL_PHOTOS.length >= 4) {
+            alert('Esta publicación ya tiene el máximo permitido de 4 fotos. Elimina alguna para agregar una nueva.');
+            event.target.value = '';
+            return;
+        }
+
+        const available = 4 - window.ADMIN_MODAL_PHOTOS.length;
+        const toUpload = Array.from(files).slice(0, available);
+
+        const spinner = document.getElementById('admUploadSpinner');
+        if (spinner) {
+            spinner.classList.remove('hidden');
+            spinner.classList.add('inline-flex');
+        }
+
+        const formData = new FormData();
+        toUpload.forEach(f => formData.append('images', f));
+
+        try {
+            const res = await fetch('/api/products/upload-images/', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (data.status === 'success' && data.images) {
+                data.images.forEach(img => {
+                    if (window.ADMIN_MODAL_PHOTOS.length < 4) {
+                        window.ADMIN_MODAL_PHOTOS.push(img.url);
+                    }
+                });
+                renderAdminPhotoSlots();
+            } else {
+                alert(data.message || 'Error al subir y convertir las fotos a WebP');
+            }
+        } catch (err) {
+            alert('Error de conexión al subir las fotos');
+        } finally {
+            if (spinner) {
+                spinner.classList.add('hidden');
+                spinner.classList.remove('inline-flex');
+            }
+            event.target.value = '';
+        }
+    }
+
+    function removeAdminPhoto(index) {
+        window.ADMIN_MODAL_PHOTOS.splice(index, 1);
+        renderAdminPhotoSlots();
+    }
+
+    function toggleUrlInputFallback() {
+        const c = document.getElementById('admUrlFallbackContainer');
+        if (c) c.classList.toggle('hidden');
+    }
+
+    function addPhotoByUrl() {
+        const input = document.getElementById('admImageUrlInput');
+        const url = (input.value || '').trim();
+        if (!url) return;
+        if (window.ADMIN_MODAL_PHOTOS.length >= 4) {
+            alert('Máximo 4 fotos por publicación.');
+            return;
+        }
+        window.ADMIN_MODAL_PHOTOS.push(url);
+        input.value = '';
+        toggleUrlInputFallback();
+        renderAdminPhotoSlots();
+    }
+
+    function openProductAdminModal(productId = null) {
+        const modal = document.getElementById('adminProductModal');
+        const form = document.getElementById('adminProductForm');
+        form.reset();
+
+        if (productId) {
+            const p = (window.ADMIN_PRODUCTS || []).find(item => item.id === productId);
+            if (!p) return;
+            document.getElementById('adminModalTitle').textContent = 'Editar Prenda: ' + p.name;
+            document.getElementById('admProdId').value = p.id;
+            document.getElementById('admName').value = p.name;
+            document.getElementById('admCategory').value = p.category_id;
+            document.getElementById('admPriceRetail').value = p.price_retail;
+            document.getElementById('admPriceWholesale').value = p.price_wholesale;
+            document.getElementById('admWholesaleMin').value = p.wholesale_min_qty;
+            document.getElementById('admSku').value = p.sku;
+            document.getElementById('admStock').value = p.stock;
+            document.getElementById('admImmediate').checked = !!p.is_immediate;
+            document.getElementById('admDescription').value = p.description;
+
+            window.ADMIN_MODAL_PHOTOS = (p.images && p.images.length > 0) ? [...p.images] : (p.image_url ? [p.image_url] : []);
+            renderAdminPhotoSlots();
+
+            document.querySelectorAll('input[name="admSizes"]').forEach(cb => {
+                cb.checked = p.size_ids.includes(parseInt(cb.value));
+            });
+            document.querySelectorAll('input[name="admColors"]').forEach(cb => {
+                cb.checked = p.color_ids.includes(parseInt(cb.value));
+            });
+        } else {
+            document.getElementById('adminModalTitle').textContent = 'Agregar Nueva Prenda al Catálogo';
+            document.getElementById('admProdId').value = '';
+            window.ADMIN_MODAL_PHOTOS = [];
+            renderAdminPhotoSlots();
+            document.querySelectorAll('input[name="admColors"]').forEach((cb, i) => { cb.checked = i < 3; });
+        }
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function closeProductAdminModal() {
+        const modal = document.getElementById('adminProductModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    async function submitAdminProduct(e) {
+        e.preventDefault();
+        const prodId = document.getElementById('admProdId').value;
+        const sizeIds = Array.from(document.querySelectorAll('input[name="admSizes"]:checked')).map(cb => parseInt(cb.value));
+        const colorIds = Array.from(document.querySelectorAll('input[name="admColors"]:checked')).map(cb => parseInt(cb.value));
+
+        const images = window.ADMIN_MODAL_PHOTOS.slice(0, 4);
+        if (images.length === 0) {
+            alert('Por favor agrega al menos una foto (máximo 4 fotos en formato WebP).');
+            return;
+        }
+
+        const payload = {
+            name: document.getElementById('admName').value,
+            category_id: parseInt(document.getElementById('admCategory').value),
+            price_retail: parseFloat(document.getElementById('admPriceRetail').value),
+            price_wholesale: parseFloat(document.getElementById('admPriceWholesale').value),
+            wholesale_min_qty: parseInt(document.getElementById('admWholesaleMin').value),
+            sku: document.getElementById('admSku').value,
+            stock: parseInt(document.getElementById('admStock').value),
+            is_immediate: document.getElementById('admImmediate').checked,
+            image_url: images[0],
+            images: images,
+            description: document.getElementById('admDescription').value,
+            size_ids: sizeIds,
+            color_ids: colorIds
+        };
+
+        const url = prodId ? `/api/products/edit/${prodId}/` : `/api/products/add/`;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            window.location.reload();
+        } else {
+            alert(data.message || 'Error al guardar la prenda');
+        }
+    }
+
+    async function deleteProductAdmin(id, name) {
+        if (!confirm(`¿Eliminar la prenda "${name}" del catálogo?`)) return;
+        const res = await fetch(`/api/products/delete/${id}/`, { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'success') window.location.reload();
+    }
+
+    async function updateOrderStatus(orderId, status) {
+        await fetch(`/api/orders/status/${orderId}/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+    }
+
+    async function saveStoreSettings(e) {
+        e.preventDefault();
+        const payload = {
+            store_name: document.getElementById('setStoreName').value,
+            store_location: document.getElementById('setStoreLocation').value,
+            store_address: document.getElementById('setStoreAddress').value,
+            owner_name: document.getElementById('setOwnerName').value,
+            owner_phone: document.getElementById('setOwnerPhone').value,
+            bcv_rate: parseFloat(document.getElementById('setBcvRate').value),
+            announcement: document.getElementById('setAnnouncement').value,
+            combine_wholesale_enabled: document.getElementById('setCombineWholesale').checked,
+            global_wholesale_min_units: parseInt(document.getElementById('setGlobalMinUnits').value)
+        };
+        const res = await fetch('/api/settings/update/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.status === 'success') window.location.reload();
+    }
+
+    async function resetDemoCatalog() {
+        if (!confirm('¿Restablecer todas las prendas y pedidos de demostración?')) return;
+        const res = await fetch('/api/reset-demo/', { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'success') window.location.reload();
+    }
+
+    function reloadOnAttributesTab() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', 'attributes');
+        window.location.href = url.toString();
+    }
+
+    // --- GESTIÓN PERSONALIZADA DE COLORES ---
+    function editCustomColor(id, name, hex) {
+        document.getElementById('cfgColorId').value = id;
+        document.getElementById('cfgColorName').value = name;
+        document.getElementById('cfgColorPicker').value = hex;
+        document.getElementById('cfgColorHex').value = hex.toUpperCase();
+        document.getElementById('cfgColorFormTitle').textContent = 'Editando Color: ' + name;
+        document.getElementById('cfgColorSubmitBtn').textContent = 'Actualizar';
+        document.getElementById('cfgColorCancelBtn').classList.remove('hidden');
+        document.getElementById('cfgColorName').focus();
+    }
+
+    function resetColorForm() {
+        document.getElementById('cfgColorId').value = '';
+        document.getElementById('cfgColorName').value = '';
+        document.getElementById('cfgColorPicker').value = '#8C4A32';
+        document.getElementById('cfgColorHex').value = '#8C4A32';
+        document.getElementById('cfgColorFormTitle').textContent = '+ Agregar Nuevo Color';
+        document.getElementById('cfgColorSubmitBtn').textContent = 'Guardar Color';
+        document.getElementById('cfgColorCancelBtn').classList.add('hidden');
+    }
+
+    async function saveCustomColor(e) {
+        e.preventDefault();
+        const id = document.getElementById('cfgColorId').value;
+        const name = document.getElementById('cfgColorName').value.trim();
+        const hex_code = document.getElementById('cfgColorHex').value.trim() || document.getElementById('cfgColorPicker').value;
+        if (!name) return;
+
+        const res = await fetch('/api/colors/save/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id ? parseInt(id) : null, name, hex_code })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            reloadOnAttributesTab();
+        } else {
+            alert(data.message || 'Error al guardar el color');
+        }
+    }
+
+    async function deleteCustomColor(id, name) {
+        if (!confirm(`¿Seguro que deseas eliminar el color "${name}" del sistema?`)) return;
+        const res = await fetch(`/api/colors/delete/${id}/`, { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'success') {
+            reloadOnAttributesTab();
+        } else {
+            alert(data.message || 'No se pudo eliminar el color');
+        }
+    }
+
+    // --- GESTIÓN PERSONALIZADA DE TALLAS ---
+    function editCustomSize(id, name, order) {
+        document.getElementById('cfgSizeId').value = id;
+        document.getElementById('cfgSizeName').value = name;
+        document.getElementById('cfgSizeOrder').value = order;
+        document.getElementById('cfgSizeFormTitle').textContent = 'Editando Talla: ' + name;
+        document.getElementById('cfgSizeSubmitBtn').textContent = 'Actualizar';
+        document.getElementById('cfgSizeCancelBtn').classList.remove('hidden');
+        document.getElementById('cfgSizeName').focus();
+    }
+
+    function resetSizeForm() {
+        document.getElementById('cfgSizeId').value = '';
+        document.getElementById('cfgSizeName').value = '';
+        document.getElementById('cfgSizeOrder').value = '';
+        document.getElementById('cfgSizeFormTitle').textContent = '+ Agregar Nueva Talla';
+        document.getElementById('cfgSizeSubmitBtn').textContent = 'Guardar Talla';
+        document.getElementById('cfgSizeCancelBtn').classList.add('hidden');
+    }
+
+    async function saveCustomSize(e) {
+        e.preventDefault();
+        const id = document.getElementById('cfgSizeId').value;
+        const name = document.getElementById('cfgSizeName').value.trim();
+        const order = document.getElementById('cfgSizeOrder').value;
+        if (!name) return;
+
+        const res = await fetch('/api/sizes/save/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id ? parseInt(id) : null, name, order: order ? parseInt(order) : 0 })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            reloadOnAttributesTab();
+        } else {
+            alert(data.message || 'Error al guardar la talla');
+        }
+    }
+
+    async function quickAddSize(sizeName) {
+        const res = await fetch('/api/sizes/save/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: sizeName })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            reloadOnAttributesTab();
+        }
+    }
+
+    async function deleteCustomSize(id, name) {
+        if (!confirm(`¿Seguro que deseas eliminar la talla "${name}" del sistema?`)) return;
+        const res = await fetch(`/api/sizes/delete/${id}/`, { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'success') {
+            reloadOnAttributesTab();
+        } else {
+            alert(data.message || 'No se pudo eliminar la talla');
+        }
+    }
+
+    // --- GESTIÓN DE CATEGORÍAS CON IMÁGENES / FOTOS EN LA TIENDA PRINCIPAL ---
+    function reloadOnCategoriesTab() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', 'categories');
+        window.location.href = url.toString();
+    }
+
+    async function handleCatImageFile(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+
+        const spinner = document.getElementById('catUploadSpinner');
+        if (spinner) {
+            spinner.classList.remove('hidden');
+            spinner.classList.add('flex');
+        }
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        try {
+            const res = await fetch('/api/categories/upload-image/', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (data.status === 'success' && data.image_url) {
+                setCategoryUploadedImage(data.image_url);
+            } else {
+                alert(data.message || 'Error al subir la imagen');
+            }
+        } catch (err) {
+            alert('Error de conexión al subir la imagen');
+        } finally {
+            if (spinner) {
+                spinner.classList.add('hidden');
+                spinner.classList.remove('flex');
+            }
+            event.target.value = '';
+        }
+    }
+
+    function setCategoryUploadedImage(url) {
+        document.getElementById('cfgCatImageUrl').value = url || '';
+
+        const emptyBox = document.getElementById('catUploadBoxEmpty');
+        const filledBox = document.getElementById('catUploadBoxFilled');
+        const thumb = document.getElementById('catUploadedThumb');
+
+        if (url) {
+            if (thumb) thumb.src = url;
+            if (emptyBox) emptyBox.classList.add('hidden');
+            if (filledBox) {
+                filledBox.classList.remove('hidden');
+                filledBox.classList.add('flex');
+            }
+        } else {
+            if (emptyBox) emptyBox.classList.remove('hidden');
+            if (filledBox) {
+                filledBox.classList.add('hidden');
+                filledBox.classList.remove('flex');
+            }
+        }
+
+        updateCategoryLivePreview();
+    }
+
+    function removeCatImage() {
+        setCategoryUploadedImage('');
+        const fileInput = document.getElementById('cfgCatImageInput');
+        if (fileInput) fileInput.value = '';
+    }
+
+    function updateCategoryLivePreview() {
+        const nameVal = document.getElementById('cfgCatName')?.value.trim() || 'Categoría';
+        const imgUrl = document.getElementById('cfgCatImageUrl')?.value.trim() || '';
+
+        const pNormalName = document.getElementById('previewNormalName');
+        const pActiveName = document.getElementById('previewActiveName');
+        if (pNormalName) pNormalName.textContent = nameVal;
+        if (pActiveName) pActiveName.textContent = nameVal;
+
+        const initials = nameVal.length >= 2 ? nameVal.substring(0, 2).toUpperCase() : nameVal.toUpperCase();
+
+        const pImgNormal = document.getElementById('previewImgNormal');
+        const pImgActive = document.getElementById('previewImgActive');
+        const pFbNormal = document.getElementById('previewFallbackNormal');
+        const pFbActive = document.getElementById('previewFallbackActive');
+
+        if (imgUrl) {
+            if (pImgNormal) {
+                pImgNormal.src = imgUrl;
+                pImgNormal.classList.remove('hidden');
+            }
+            if (pImgActive) {
+                pImgActive.src = imgUrl;
+                pImgActive.classList.remove('hidden');
+            }
+            if (pFbNormal) pFbNormal.classList.add('hidden');
+            if (pFbActive) pFbActive.classList.add('hidden');
+        } else {
+            if (pImgNormal) pImgNormal.classList.add('hidden');
+            if (pImgActive) pImgActive.classList.add('hidden');
+            if (pFbNormal) {
+                pFbNormal.textContent = initials || 'CA';
+                pFbNormal.classList.remove('hidden');
+            }
+            if (pFbActive) {
+                pFbActive.textContent = initials || 'CA';
+                pFbActive.classList.remove('hidden');
+            }
+        }
+    }
+
+    function editCategoryWithImage(id, name, imageUrl, desc) {
+        switchAdminTab('categories');
+        document.getElementById('cfgCatId').value = id;
+        document.getElementById('cfgCatName').value = name;
+        document.getElementById('cfgCatDescription').value = desc || '';
+
+        const title = document.getElementById('catFormHeaderTitle');
+        if (title) title.innerHTML = `<i class="fa-solid fa-pen-to-square text-[#8C4A32]"></i> Editando Categoría: <span class="text-[#8C4A32]">${name}</span>`;
+
+        const btnText = document.getElementById('catSubmitBtnText');
+        if (btnText) btnText.textContent = 'Actualizar Categoría';
+
+        const cancelBtn = document.getElementById('catFormCancelBtn');
+        if (cancelBtn) cancelBtn.classList.remove('hidden');
+
+        setCategoryUploadedImage(imageUrl || '');
+
+        const card = document.getElementById('catFormCard');
+        if (card) card.scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('cfgCatName').focus();
+    }
+
+    function resetCategoryForm() {
+        document.getElementById('cfgCatId').value = '';
+        document.getElementById('cfgCatName').value = '';
+        document.getElementById('cfgCatDescription').value = '';
+
+        const title = document.getElementById('catFormHeaderTitle');
+        if (title) title.innerHTML = `<i class="fa-solid fa-circle-plus text-[#8C4A32]"></i> Agregar Nueva Categoría`;
+
+        const btnText = document.getElementById('catSubmitBtnText');
+        if (btnText) btnText.textContent = 'Guardar Categoría';
+
+        const cancelBtn = document.getElementById('catFormCancelBtn');
+        if (cancelBtn) cancelBtn.classList.add('hidden');
+
+        setCategoryUploadedImage('');
+    }
+
+    async function saveCustomCategoryWithImage(e) {
+        e.preventDefault();
+        const id = document.getElementById('cfgCatId').value;
+        const name = document.getElementById('cfgCatName').value.trim();
+        const image_url = document.getElementById('cfgCatImageUrl').value.trim();
+        const description = document.getElementById('cfgCatDescription').value.trim();
+
+        if (!name) {
+            alert('Por favor ingresa un nombre para la categoría');
+            return;
+        }
+
+        const submitBtn = document.getElementById('catSubmitBtn');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-75');
+        }
+
+        try {
+            const res = await fetch('/api/categories/save/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: id ? parseInt(id) : null,
+                    name,
+                    image_url,
+                    description
+                })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                reloadOnCategoriesTab();
+            } else {
+                alert(data.message || 'Error al guardar la categoría');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-75');
+                }
+            }
+        } catch (err) {
+            alert('Ocurrió un error en la conexión');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-75');
+            }
+        }
+    }
+
+    async function deleteCustomCategory(id, name) {
+        if (!confirm(`¿Eliminar la categoría "${name}"?\nLas prendas asociadas deberán ser reasignadas.`)) return;
+        const res = await fetch(`/api/categories/delete/${id}/`, { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'success') {
+            reloadOnCategoriesTab();
+        } else {
+            alert(data.message || 'No se pudo eliminar la categoría');
+        }
+    }
+
+    // --- CREACIÓN RÁPIDA DE TALLAS Y COLORES DESDE EL MODAL DE PRENDA ---
+    async function createInlineSize() {
+        const input = document.getElementById('inlineNewSizeName');
+        const name = input.value.trim();
+        if (!name) {
+            input.focus();
+            return;
+        }
+        const res = await fetch('/api/sizes/save/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        if (data.status === 'success' && data.size) {
+            input.value = '';
+            const existingCb = document.querySelector(`input[name="admSizes"][value="${data.size.id}"]`);
+            if (existingCb) {
+                existingCb.checked = true;
+            } else {
+                const container = document.getElementById('admSizesContainer');
+                const label = document.createElement('label');
+                label.className = 'cursor-pointer';
+                label.innerHTML = `
+                    <input type="checkbox" name="admSizes" value="${data.size.id}" class="peer sr-only" checked>
+                    <span class="px-3 py-1.5 rounded-lg text-xs font-bold border border-stone-300 bg-white text-[#1E1B18] peer-checked:bg-[#1E1B18] peer-checked:text-white transition inline-block">
+                        ${data.size.name}
+                    </span>
+                `;
+                container.appendChild(label);
+            }
+        } else {
+            alert(data.message || 'No se pudo crear la talla');
+        }
+    }
+
+    async function createInlineColor() {
+        const nameInput = document.getElementById('inlineNewColorName');
+        const hexInput = document.getElementById('inlineNewColorHex');
+        const name = nameInput.value.trim();
+        const hex_code = hexInput.value || '#8C4A32';
+        if (!name) {
+            nameInput.focus();
+            return;
+        }
+        const res = await fetch('/api/colors/save/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, hex_code })
+        });
+        const data = await res.json();
+        if (data.status === 'success' && data.color) {
+            nameInput.value = '';
+            const existingCb = document.querySelector(`input[name="admColors"][value="${data.color.id}"]`);
+            if (existingCb) {
+                existingCb.checked = true;
+            } else {
+                const container = document.getElementById('admColorsContainer');
+                const label = document.createElement('label');
+                label.className = 'cursor-pointer';
+                label.innerHTML = `
+                    <input type="checkbox" name="admColors" value="${data.color.id}" class="peer sr-only" checked>
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-stone-300 bg-white peer-checked:border-[#8C4A32] peer-checked:bg-[#FAF7F4] peer-checked:font-bold transition">
+                        <span class="w-3.5 h-3.5 rounded-full border border-black/25" style="background-color: ${data.color.hex_code};"></span>
+                        <span>${data.color.name}</span>
+                    </span>
+                `;
+                container.appendChild(label);
+            }
+        } else {
+            alert(data.message || 'No se pudo crear el color');
+        }
+    }
+
+    // --- GESTIÓN DEL BANNER PUBLICITARIO Y DESCUENTOS ---
+    function setPromoBadgeQuick(text) {
+        const badgeInput = document.getElementById('promoBadge');
+        if (badgeInput) {
+            badgeInput.value = text;
+            updatePromoLivePreview();
+        }
+    }
+
+    function handlePromoProductChange(productId) {
+        const select = document.getElementById('promoProductId');
+        if (!select) return;
+        const opt = select.options[select.selectedIndex];
+        if (!opt || !productId) {
+            updatePromoLivePreview();
+            return;
+        }
+
+        const name = opt.getAttribute('data-name');
+        const price = opt.getAttribute('data-price');
+        const wholesale = opt.getAttribute('data-wholesale');
+        const img = opt.getAttribute('data-img');
+
+        const titleInput = document.getElementById('promoTitle');
+        const priceInput = document.getElementById('promoPrice');
+        const wholesaleInput = document.getElementById('promoWholesaleNote');
+
+        if (name && (!titleInput.value || titleInput.value.includes('Body Manga Larga') || titleInput.value === 'Oversized Heavy Tee')) {
+            titleInput.value = name;
+        }
+        if (price) {
+            priceInput.value = price;
+        }
+        if (wholesale) {
+            wholesaleInput.value = wholesale;
+        }
+        if (img) {
+            setPromoImage(img);
+        }
+
+        updatePromoLivePreview();
+    }
+
+    async function handlePromoImageFile(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+
+        const spinner = document.getElementById('promoUploadSpinner');
+        if (spinner) {
+            spinner.classList.remove('hidden');
+            spinner.classList.add('inline-flex');
+        }
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        try {
+            const res = await fetch('/api/promo-banner/upload-image/', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                setPromoImage(data.image_url);
+            } else {
+                alert(data.message || 'Error al subir la imagen');
+            }
+        } catch (err) {
+            alert('Error al conectar con el servidor para subir la imagen');
+        } finally {
+            if (spinner) {
+                spinner.classList.remove('inline-flex');
+                spinner.classList.add('hidden');
+            }
+            event.target.value = '';
+        }
+    }
+
+    function setPromoImage(url) {
+        const urlInput = document.getElementById('promoImageUrl');
+        const emptyBox = document.getElementById('promoUploadBoxEmpty');
+        const filledBox = document.getElementById('promoUploadBoxFilled');
+        const thumb = document.getElementById('promoUploadedThumb');
+        const prevImg = document.getElementById('prevImg');
+
+        if (urlInput) urlInput.value = url;
+
+        if (url) {
+            if (emptyBox) emptyBox.classList.add('hidden');
+            if (filledBox) {
+                filledBox.classList.remove('hidden');
+                filledBox.classList.add('flex');
+            }
+            if (thumb) thumb.src = url;
+            if (prevImg) prevImg.src = url;
+        } else {
+            if (emptyBox) emptyBox.classList.remove('hidden');
+            if (filledBox) {
+                filledBox.classList.add('hidden');
+                filledBox.classList.remove('flex');
+            }
+            if (thumb) thumb.src = '';
+            if (prevImg) prevImg.src = '/static/img/shibui_model_hero.png';
+        }
+    }
+
+    function removePromoImage() {
+        setPromoImage('');
+    }
+
+    function updatePromoLivePreview() {
+        const badge = document.getElementById('promoBadge')?.value.trim() || 'COLECCIÓN DESTACADA';
+        const title = document.getElementById('promoTitle')?.value.trim() || 'Título del Anuncio';
+        const price = document.getElementById('promoPrice')?.value.trim() || '$0';
+        const priceNote = document.getElementById('promoPriceNote')?.value.trim() || '';
+        const wholesale = document.getElementById('promoWholesaleNote')?.value.trim() || '';
+        const btnText = document.getElementById('promoButtonText')?.value.trim() || 'Comprar Ahora';
+        const imgUrl = document.getElementById('promoImageUrl')?.value.trim();
+
+        const prevBadge = document.getElementById('prevBadge');
+        const prevTitle = document.getElementById('prevTitle');
+        const prevPrice = document.getElementById('prevPrice');
+        const prevPriceNote = document.getElementById('prevPriceNote');
+        const prevWholesale = document.getElementById('prevWholesale');
+        const prevBtn = document.getElementById('prevButtonText');
+        const prevImg = document.getElementById('prevImg');
+
+        if (prevBadge) prevBadge.textContent = badge;
+        if (prevTitle) prevTitle.textContent = title;
+        if (prevPrice) prevPrice.textContent = price;
+        if (prevPriceNote) prevPriceNote.textContent = priceNote;
+        if (prevWholesale) prevWholesale.textContent = wholesale;
+        if (prevBtn) prevBtn.textContent = btnText;
+        if (prevImg && imgUrl) prevImg.src = imgUrl;
+    }
+
+    async function savePromoBannerSettings(e) {
+        e.preventDefault();
+        const submitBtn = document.getElementById('promoSubmitBtn');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-75');
+        }
+
+        const payload = {
+            promo_banner_active: document.getElementById('promoBannerActive')?.checked ?? true,
+            promo_badge: document.getElementById('promoBadge')?.value.trim() || '',
+            promo_title: document.getElementById('promoTitle')?.value.trim() || '',
+            promo_price: document.getElementById('promoPrice')?.value.trim() || '',
+            promo_price_note: document.getElementById('promoPriceNote')?.value.trim() || '',
+            promo_wholesale_note: document.getElementById('promoWholesaleNote')?.value.trim() || '',
+            promo_button_text: document.getElementById('promoButtonText')?.value.trim() || 'Comprar Ahora',
+            promo_button_link: document.getElementById('promoButtonLink')?.value.trim() || '',
+            promo_image_url: document.getElementById('promoImageUrl')?.value.trim() || '',
+            promo_product_id: document.getElementById('promoProductId')?.value || null
+        };
+
+        try {
+            const res = await fetch('/api/promo-banner/update/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                alert('¡Banner publicitario y descuentos guardados correctamente!');
+                window.location.search = '?tab=promobanner';
+            } else {
+                alert(data.message || 'Error al guardar el banner publicitario');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-75');
+                }
+            }
+        } catch (err) {
+            alert('Error de conexión al guardar los ajustes del banner');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-75');
+            }
+        }
+    }
+
+    // Inicializar componentes al cargar la página
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof updateCategoryLivePreview === 'function') {
+            updateCategoryLivePreview();
+        }
+
+        if (typeof updatePromoLivePreview === 'function') {
+            const initImg = document.getElementById('promoImageUrl')?.value;
+            if (initImg) {
+                setPromoImage(initImg);
+            }
+            updatePromoLivePreview();
+        }
+
+        // Mantener pestaña activa tras recargar si viene en ?tab=...
+        const params = new URLSearchParams(window.location.search);
+        const tab = params.get('tab');
+        if (tab && ['inventory', 'promobanner', 'categories', 'attributes', 'orders', 'settings'].includes(tab)) {
+            switchAdminTab(tab);
+        }
+    });
+</script>
+{% endblock %}

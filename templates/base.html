@@ -1,0 +1,832 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ store_settings.store_name }} | Catálogo de Ropa{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{% static 'img/shibui_logo.png' %}">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts: Plus Jakarta Sans & Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        shibui: {
+                            dark: '#2B2B2B',
+                            charcoal: '#333333',
+                            black: '#141414',
+                            gray: '#F3F3F3',
+                            cardlight: '#F5F5F5',
+                            pink: '#E88D9E'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        html {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #EBEBEB;
+            color: #1A1A1A;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+            position: relative;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Patrón de cuadrícula sutil para las tarjetas oscuras como en el diseño de inspiración */
+        .dark-grid-surface {
+            background-color: #2D2D2D;
+            background-image: 
+                linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
+            background-size: 28px 28px;
+        }
+
+        /* Tarjetas Bento */
+        .st-card-light {
+            background-color: #F6F6F6;
+            border-radius: 1.65rem;
+            border: 1px solid #EAEAEA;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .st-card-light:hover {
+            transform: translateY(-4px);
+            background-color: #FFFFFF;
+            box-shadow: 0 20px 35px -15px rgba(0,0,0,0.08);
+        }
+
+        .st-card-dark {
+            background-color: #333333;
+            color: #FFFFFF;
+            border-radius: 1.65rem;
+            border: 1px solid #404040;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .st-card-dark:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 22px 40px -15px rgba(0,0,0,0.28);
+        }
+
+        /* Círculos de Categorías */
+        .cat-circle-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.45rem;
+            min-width: 4.2rem;
+            cursor: pointer;
+        }
+        .cat-circle-icon {
+            width: 3.6rem;
+            height: 3.6rem;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            background-color: #FFFFFF;
+            color: #2B2B2B;
+            border: 1.5px solid #E5E5E5;
+            transition: all 0.2s ease;
+        }
+        .cat-circle-item:hover .cat-circle-icon {
+            border-color: #2B2B2B;
+            transform: scale(1.05);
+        }
+        .cat-circle-item.active .cat-circle-icon {
+            background-color: #2B2B2B;
+            color: #FFFFFF;
+            border-color: #2B2B2B;
+            box-shadow: 0 8px 18px rgba(43, 43, 43, 0.25);
+        }
+
+        /* Tallas tipográficas (XS S M L XL) */
+        .st-size-text-btn {
+            padding: 0.25rem 0.45rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #7A7A7A;
+            transition: all 0.15s ease;
+            position: relative;
+        }
+        .st-size-text-btn:hover {
+            color: #141414;
+        }
+        .st-size-text-btn.selected {
+            color: #141414;
+            font-weight: 800;
+        }
+        .st-size-text-btn.selected::after {
+            content: "";
+            position: absolute;
+            left: 0.4rem;
+            right: 0.4rem;
+            bottom: 0;
+            height: 2.5px;
+            background-color: #141414;
+            border-radius: 2px;
+        }
+
+        /* Puntos de color en el modal */
+        .st-color-dot {
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: 9999px;
+            border: 1px solid rgba(0,0,0,0.2);
+            position: relative;
+            transition: transform 0.15s ease;
+        }
+        .st-color-dot.selected {
+            transform: scale(1.12);
+        }
+        .st-color-dot.selected::after {
+            content: "";
+            position: absolute;
+            inset: -4px;
+            border: 2px solid #2B2B2B;
+            border-radius: 9999px;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased pb-24">
+
+    <!-- Cintillo Superior Discreto -->
+    <div class="bg-[#2B2B2B] text-white text-[10px] sm:text-[11px] py-1.5 sm:py-2 px-3 sm:px-4 text-center font-medium tracking-wide w-full overflow-hidden">
+        <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-center gap-1 sm:gap-2">
+            <span class="truncate max-w-[90vw] sm:max-w-none">{{ store_settings.announcement }}</span>
+            <span class="hidden sm:inline-block text-zinc-300 font-semibold">
+                · Tasa ref: Bs. {{ store_settings.bcv_rate|floatformat:2 }} / USD
+            </span>
+        </div>
+    </div>
+
+    <!-- CABECERA MINIMALISTA CON LOGO SHIBUI -->
+    <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-zinc-200/70 w-full overflow-hidden">
+        <div class="max-w-6xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2 sm:gap-4">
+            
+            <!-- Marca + Logo SHIBUI -->
+            <a href="{% url 'catalog:index' %}" class="flex items-center gap-2 sm:gap-3 group min-w-0 flex-1">
+                <img src="{% static 'img/shibui_logo.png' %}"
+                     alt="{{ store_settings.store_name }}"
+                     class="h-9 w-9 sm:h-12 sm:w-12 object-contain rounded-xl sm:rounded-2xl border border-zinc-200 bg-white p-0.5 shadow-2xs group-hover:scale-105 transition shrink-0">
+                <div class="min-w-0 flex-1">
+                    <span class="text-[#141414] text-base sm:text-xl font-extrabold tracking-tight block leading-none truncate">
+                        {{ store_settings.store_name }}
+                    </span>
+                    <span class="text-[10px] sm:text-[11px] text-zinc-500 font-medium flex items-center gap-1 mt-0.5 sm:mt-1 truncate" title="Dirección: {{ store_settings.store_address }}">
+                        <i class="fa-solid fa-location-dot text-zinc-800 text-[9px] shrink-0"></i>
+                        <span class="truncate max-w-[130px] sm:max-w-md">{{ store_settings.store_location }}{% if store_settings.store_address %} · {{ store_settings.store_address }}{% endif %}</span>
+                    </span>
+                </div>
+            </a>
+
+            <!-- Buscador Píldora Central (Oculto en móvil) -->
+            <form action="{% url 'catalog:index' %}" method="GET" class="flex-1 max-w-md mx-auto hidden sm:block">
+                {% if current_category and current_category != 'todas' %}
+                <input type="hidden" name="categoria" value="{{ current_category }}">
+                {% endif %}
+                <div class="relative flex items-center">
+                    <i class="fa-solid fa-magnifying-glass text-zinc-400 text-sm absolute left-4 pointer-events-none"></i>
+                    <input type="text" name="q" value="{{ search_query|default:'' }}"
+                           placeholder="Buscar en {{ store_settings.store_name }} (Conjuntos, Vestidos, Blusas...)"
+                           class="w-full h-11 pl-10 pr-10 rounded-full bg-[#F3F3F3] border border-transparent focus:border-zinc-300 focus:bg-white text-sm text-[#141414] placeholder-zinc-400 focus:outline-none transition">
+                    {% if search_query %}
+                    <a href="{% url 'catalog:index' %}" class="absolute right-4 text-zinc-400 hover:text-black text-xs">
+                        <i class="fa-solid fa-xmark"></i>
+                    </a>
+                    {% else %}
+                    <button type="submit" class="absolute right-4 text-zinc-400 hover:text-black">
+                        <i class="fa-solid fa-sliders text-xs"></i>
+                    </button>
+                    {% endif %}
+                </div>
+            </form>
+
+            <!-- Acciones Derecha: Mi Cuenta + WhatsApp + Bolsa -->
+            <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                <!-- Botón Mi Cuenta -->
+                <a href="{% url 'catalog:customer_account' %}"
+                   class="inline-flex items-center justify-center gap-1.5 w-9 h-9 sm:w-auto sm:h-auto sm:px-3.5 sm:py-2 rounded-full bg-[#F3F3F3] hover:bg-[#2B2B2B] text-[#2B2B2B] hover:text-white text-xs font-bold transition shadow-2xs"
+                   title="Mi Cuenta">
+                    <i class="fa-regular fa-user text-xs"></i>
+                    <span class="hidden sm:inline">Mi Cuenta</span>
+                </a>
+
+                <a href="https://wa.me/{{ store_settings.owner_phone|cut:'+'|cut:' ' }}?text=Hola%20{{ store_settings.store_name|urlencode }}%2C%20vengo%20del%20cat%C3%A1logo%20web."
+                   target="_blank"
+                   class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#F3F3F3] hover:bg-[#2B2B2B] text-[#2B2B2B] hover:text-white flex items-center justify-center transition shadow-2xs"
+                   title="Consultar por WhatsApp">
+                    <i class="fa-brands fa-whatsapp text-sm sm:text-base"></i>
+                </a>
+
+                <button type="button" onclick="toggleCartDrawer(true)"
+                        class="relative inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-[#2B2B2B] hover:bg-black text-white text-xs font-bold transition shadow-sm">
+                    <i class="fa-solid fa-bag-shopping text-xs"></i>
+                    <span class="hidden md:inline">Bolsa</span>
+                    <span id="navCartBadge"
+                          class="px-1.5 py-0.5 rounded-full bg-white text-[#141414] text-[10px] font-extrabold leading-none">
+                        0
+                    </span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="flex-1">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- =================================================================== -->
+    <!-- BARRA INFERIOR FLOTANTE (Inicio | Bolsa | Reseñas | Mi Cuenta)      -->
+    <!-- =================================================================== -->
+    <div class="fixed bottom-4 left-1/2 -translate-x-1/2 z-30">
+        <nav class="bg-[#F2F2F2]/95 backdrop-blur-md border border-white shadow-[0_12px_30px_rgba(0,0,0,0.15)] rounded-full px-3 py-2 flex items-center gap-3">
+            <!-- 1. Inicio / Catálogo -->
+            <a href="{% url 'catalog:index' %}"
+               class="w-11 h-11 rounded-full flex items-center justify-center transition {% if request.resolver_match.url_name == 'index' and not only_wholesale and not only_immediate %}bg-[#333333] text-white shadow-md{% else %}bg-white text-zinc-600 hover:text-black{% endif %}"
+               title="Inicio Catálogo">
+                <i class="fa-solid fa-house text-sm"></i>
+            </a>
+
+            <!-- 2. Bolsa de Compras -->
+            <button type="button" onclick="toggleCartDrawer(true)"
+                    class="relative w-11 h-11 rounded-full bg-white text-zinc-700 hover:bg-[#333333] hover:text-white flex items-center justify-center transition shadow-2xs"
+                    title="Abrir Bolsa de Compras">
+                <i class="fa-solid fa-bag-shopping text-sm"></i>
+                <span id="dockCartBadge" class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#2B2B2B] text-white text-[9px] font-bold flex items-center justify-center">0</span>
+            </button>
+
+            <!-- 3. Reseñas de Prendas y Conjuntos -->
+            <a href="{% url 'catalog:customer_account' %}"
+               class="w-11 h-11 rounded-full bg-white text-zinc-700 hover:bg-[#333333] hover:text-white flex items-center justify-center transition shadow-2xs"
+               title="Reseñas de Ropa">
+                <i class="fa-regular fa-heart text-sm"></i>
+            </a>
+
+            <!-- 4. Mi Cuenta -->
+            <a href="{% url 'catalog:customer_account' %}"
+               class="w-11 h-11 rounded-full flex items-center justify-center transition shadow-2xs {% if request.resolver_match.url_name in 'customer_account,customer_login,customer_register' %}bg-[#333333] text-white{% else %}bg-white text-zinc-700 hover:bg-[#333333] hover:text-white{% endif %}"
+               title="Mi Cuenta">
+                <i class="fa-regular fa-user text-sm"></i>
+            </a>
+        </nav>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- PANEL LATERAL DE LA BOLSA DE COMPRAS                                -->
+    <!-- =================================================================== -->
+    <div id="cartDrawerBackdrop" onclick="toggleCartDrawer(false)"
+         class="fixed inset-0 bg-black/50 z-40 hidden transition-opacity"></div>
+
+    <aside id="cartDrawer"
+           class="fixed top-0 right-0 h-full w-[92vw] sm:w-[26rem] bg-white z-50 shadow-2xl transform translate-x-full transition-transform duration-300 flex flex-col justify-between rounded-l-[28px] overflow-hidden">
+        
+        <div class="p-6 pb-4 border-b border-zinc-100">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-[#141414] font-extrabold text-xl tracking-tight">Tu Bolsa</h2>
+                    <p class="text-xs text-zinc-400">Precios al detal y al mayor automáticos</p>
+                </div>
+                <button type="button" onclick="toggleCartDrawer(false)"
+                        class="w-9 h-9 rounded-full bg-[#F3F3F3] flex items-center justify-center text-zinc-700 hover:bg-[#2B2B2B] hover:text-white text-lg font-bold transition">
+                    &times;
+                </button>
+            </div>
+
+            <!-- Barra de progreso interactiva para Mayoreo Surtido -->
+            <div id="wholesaleProgressBox" class="mt-4 bg-[#F6F6F6] border border-zinc-200/80 rounded-2xl p-3.5">
+                <div class="flex items-center justify-between text-xs font-bold text-[#141414] mb-2">
+                    <span id="wholesaleStatusText">Agrega {{ store_settings.global_wholesale_min_units }} prendas para precio AL MAYOR</span>
+                    <span id="wholesaleCountBadge" class="bg-[#2B2B2B] text-white px-2.5 py-0.5 rounded-full text-[10px]">0 / {{ store_settings.global_wholesale_min_units }}</span>
+                </div>
+                <div class="w-full h-2 bg-zinc-200 rounded-full overflow-hidden">
+                    <div id="wholesaleProgressBar" class="h-full bg-[#2B2B2B] transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="cartItemsContainer" class="flex-1 overflow-y-auto px-6 py-3 divide-y divide-zinc-100"></div>
+
+        <!-- Pie del Carrito con botones píldora -->
+        <div id="cartFooter" class="p-6 pt-4 border-t border-zinc-200 bg-[#FAFAFA]">
+            <div id="cartSavingsRow" class="hidden justify-between items-center text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3.5 py-2 rounded-2xl mb-3">
+                <span><i class="fa-solid fa-bolt mr-1"></i> Descuento Mayorista Activo</span>
+                <span id="cartSavingsAmount">-$0.00 USD</span>
+            </div>
+
+            <div class="flex justify-between items-baseline mb-1">
+                <span class="text-sm font-bold text-zinc-600">Total a Pagar</span>
+                <div class="text-right">
+                    <span id="cartTotalBs" class="text-xs text-zinc-400 mr-2">Bs. 0.00</span>
+                    <span id="cartTotalUsd" class="text-xl font-extrabold text-[#141414]">$0.00 USD</span>
+                </div>
+            </div>
+            <p class="text-[11px] text-zinc-400 mb-4 flex justify-between">
+                <span>Unidades en tu pedido:</span>
+                <strong id="cartTotalUnits" class="text-[#141414]">0 piezas</strong>
+            </p>
+
+            <!-- Botones dobles píldora -->
+            <div class="grid grid-cols-5 gap-2.5">
+                <button type="button" onclick="clearCart()"
+                        class="col-span-2 py-3.5 rounded-full border border-zinc-300 bg-white hover:bg-zinc-100 text-[#141414] font-bold text-xs transition">
+                    Vaciar
+                </button>
+                <button type="button" onclick="openCheckoutModal()"
+                        class="col-span-3 py-3.5 rounded-full bg-[#333333] hover:bg-black text-white font-bold text-xs tracking-wide transition shadow-md flex items-center justify-center gap-2">
+                    <span>Comprar Ahora</span>
+                    <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- =================================================================== -->
+    <!-- MODAL DE PEDIDO Y CONFIRMACIÓN                                      -->
+    <!-- =================================================================== -->
+    <div id="checkoutModal" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-[28px] max-w-lg w-full overflow-hidden shadow-2xl border border-zinc-100 my-8">
+            
+            <div id="checkoutStepForm">
+                <div class="bg-[#2B2B2B] text-white px-6 py-4 flex items-center justify-between">
+                    <div>
+                        <h3 class="font-bold text-base">Finalizar Pedido · {{ store_settings.store_name }}</h3>
+                        <p class="text-xs text-zinc-300">Completa tus datos para enviar tu orden</p>
+                    </div>
+                    <button type="button" onclick="closeCheckoutModal()" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
+                </div>
+
+                <form id="checkoutForm" onsubmit="submitOrder(event)" class="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                    <div class="bg-[#F6F6F6] rounded-2xl p-4 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-zinc-500">Resumen (<span id="chkUnits">0</span> prendas)</p>
+                            <p id="chkModeBadge" class="text-xs font-extrabold text-[#141414] mt-0.5">Modalidad Detal</p>
+                        </div>
+                        <div class="text-right">
+                            <p id="chkTotalUsd" class="text-lg font-extrabold text-[#141414]">$0.00 USD</p>
+                            <p id="chkTotalBs" class="text-xs text-zinc-500">Bs. 0.00</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-zinc-700 mb-1">Nombre y Apellido *</label>
+                            <input type="text" id="chkName" required placeholder="Ej: Mariana Rojas"
+                                   class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:outline-none focus:bg-white focus:border-[#2B2B2B]">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-zinc-700 mb-1">Cédula / Documento *</label>
+                            <input type="text" id="chkDni" required placeholder="Ej: V-26845120"
+                                   class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:outline-none focus:bg-white focus:border-[#2B2B2B]">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-zinc-700 mb-1">Teléfono (WhatsApp) *</label>
+                        <input type="text" id="chkPhone" required placeholder="Ej: 0412-1234567"
+                               class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:outline-none focus:bg-white focus:border-[#2B2B2B]">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-zinc-700 mb-1.5">Modo de Entrega *</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="deliveryType" value="Envío Nacional (MRW / Zoom)" checked class="peer sr-only">
+                                <div class="text-center p-2.5 rounded-2xl border border-zinc-200 peer-checked:border-[#2B2B2B] peer-checked:bg-[#2B2B2B] peer-checked:text-white transition">
+                                    <i class="fa-solid fa-truck-fast text-sm mb-1 block"></i>
+                                    <span class="text-[11px] font-semibold block leading-tight">Envío Nacional</span>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="deliveryType" value="Retiro Personal" class="peer sr-only">
+                                <div class="text-center p-2.5 rounded-2xl border border-zinc-200 peer-checked:border-[#2B2B2B] peer-checked:bg-[#2B2B2B] peer-checked:text-white transition">
+                                    <i class="fa-solid fa-store text-sm mb-1 block"></i>
+                                    <span class="text-[11px] font-semibold block leading-tight">Retiro Personal</span>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="deliveryType" value="Entrega a Domicilio" class="peer sr-only">
+                                <div class="text-center p-2.5 rounded-2xl border border-zinc-200 peer-checked:border-[#2B2B2B] peer-checked:bg-[#2B2B2B] peer-checked:text-white transition">
+                                    <i class="fa-solid fa-motorcycle text-sm mb-1 block"></i>
+                                    <span class="text-[11px] font-semibold block leading-tight">A Domicilio</span>
+                                </div>
+                            </label>
+                        </div>
+                        <div id="checkoutPickupNote" class="mt-2 text-xs text-zinc-600 bg-[#F6F6F6] p-2.5 rounded-2xl border border-zinc-200/80 flex items-start gap-2">
+                            <i class="fa-solid fa-store text-zinc-800 text-xs mt-0.5"></i>
+                            <div>
+                                <span class="font-bold text-[#141414] block">Dirección de Retiro en Tienda:</span>
+                                <span>{{ store_settings.store_address|default:store_settings.store_location }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-zinc-700 mb-1">Ciudad / Estado *</label>
+                            <input type="text" id="chkCity" required placeholder="Ej: Caracas"
+                                   class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:outline-none focus:bg-white focus:border-[#2B2B2B]">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-zinc-700 mb-1">Método de Pago *</label>
+                            <select id="chkPayment" class="w-full px-3.5 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:outline-none focus:bg-white focus:border-[#2B2B2B]">
+                                <option value="Pago Móvil (Bs.)">Pago Móvil (Bs.)</option>
+                                <option value="Efectivo (Divisas)">Efectivo (Divisas)</option>
+                                <option value="Zinli / Wally">Zinli / Wally</option>
+                                <option value="Transferencia Bancaria">Transferencia Bancaria</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-zinc-700 mb-1">Agencia MRW/Zoom o Dirección *</label>
+                        <input type="text" id="chkAddress" required placeholder="Ej: Agencia MRW Altamira o dirección exacta"
+                               class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:outline-none focus:bg-white focus:border-[#2B2B2B]">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-zinc-700 mb-1">Notas del Pedido (Opcional)</label>
+                        <textarea id="chkNotes" rows="2" placeholder="Algún comentario sobre tallas o entrega..."
+                                  class="w-full px-4 py-2 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:outline-none focus:bg-white focus:border-[#2B2B2B]"></textarea>
+                    </div>
+
+                    <button type="submit" id="btnSubmitOrder"
+                            class="w-full py-3.5 rounded-full bg-[#2B2B2B] hover:bg-black text-white font-bold text-sm tracking-wide transition shadow-lg flex items-center justify-center gap-2">
+                        <span>CONFIRMAR ORDEN</span>
+                        <i class="fa-solid fa-check"></i>
+                    </button>
+                </form>
+            </div>
+
+            <div id="checkoutStepSuccess" class="hidden p-8 text-center bg-[#F6F6F6]">
+                <div class="w-16 h-16 rounded-full bg-[#2B2B2B] text-white flex items-center justify-center mx-auto mb-4 shadow-md">
+                    <i class="fa-solid fa-check text-2xl"></i>
+                </div>
+                <h3 class="text-xl font-extrabold text-[#141414]">¡Orden Creada con Éxito!</h3>
+                <p class="text-xs font-bold text-zinc-500 mt-1">Código: <span id="successOrderNumber" class="text-[#141414]">#SH-0000</span></p>
+                <p class="text-sm text-zinc-600 mt-3 leading-relaxed">
+                    Pulsa en <strong>"Continuar a WhatsApp"</strong> para enviar el detalle de tu pedido al equipo de {{ store_settings.store_name }}.
+                </p>
+
+                <div class="mt-6 flex flex-col sm:flex-row gap-2.5 justify-center">
+                    <button type="button" onclick="closeCheckoutModal()"
+                            class="px-5 py-3 rounded-full border border-zinc-300 bg-white text-[#141414] text-xs font-bold transition">
+                        Seguir viendo prendas
+                    </button>
+                    <a id="successWhatsappBtn" href="#" target="_blank"
+                       class="px-6 py-3 rounded-full bg-[#2B2B2B] hover:bg-black text-white text-xs font-bold transition inline-flex items-center justify-center gap-2 shadow-md">
+                        <i class="fa-brands fa-whatsapp text-base text-emerald-400"></i>
+                        <span>Continuar a WhatsApp</span>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- MODAL SECCIÓN DE USUARIO, CUENTA REGISTRADA Y RESEÑAS               -->
+    <!-- =================================================================== -->
+    <div id="userSectionModal" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        <div class="bg-white rounded-[30px] max-w-2xl w-full overflow-hidden shadow-2xl border border-zinc-100 my-auto max-h-[92vh] flex flex-col">
+            
+            <!-- Cabecera Usuario -->
+            <div class="bg-[#2B2B2B] text-white px-6 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-white text-[#141414] flex items-center justify-center font-extrabold text-sm shadow">
+                        <i class="fa-regular fa-user"></i>
+                    </div>
+                    <div>
+                        <h3 id="userModalHeaderName" class="font-extrabold text-base leading-tight">Sección de Usuario · {{ store_settings.store_name }}</h3>
+                        <p id="userModalHeaderSub" class="text-xs text-zinc-300">Inicia sesión con tu cuenta registrada para comentar prendas</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeUserSectionModal()" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
+            </div>
+
+            <!-- Pestañas de la Sección de Usuario -->
+            <div class="grid grid-cols-3 border-b border-zinc-200 bg-[#FAFAFA] text-xs font-extrabold text-center">
+                <button type="button" onclick="switchUserSectionTab('write-review')" id="uTabBtn-write-review"
+                        class="py-3 border-b-2 border-[#141414] text-[#141414]">
+                    <i class="fa-regular fa-star mr-1"></i> Agregar Reseña
+                </button>
+                <button type="button" onclick="switchUserSectionTab('all-reviews')" id="uTabBtn-all-reviews"
+                        class="py-3 border-b-2 border-transparent text-zinc-400 hover:text-black">
+                    <i class="fa-regular fa-comments mr-1"></i> Reseñas (<span id="uTotalReviewsCount">0</span>)
+                </button>
+                <button type="button" onclick="switchUserSectionTab('profile')" id="uTabBtn-profile"
+                        class="py-3 border-b-2 border-transparent text-zinc-400 hover:text-black">
+                    <i class="fa-regular fa-id-badge mr-1"></i> Mi Cuenta
+                </button>
+            </div>
+
+            <!-- Cuerpo Scrollable -->
+            <div class="p-6 overflow-y-auto space-y-5 flex-1">
+                
+                <!-- TAB 1: PUBLICAR UNA RESEÑA (SOLO CUENTAS REGISTRADAS) -->
+                <div id="uTabPanel-write-review">
+                    
+                    <!-- Aviso de bloqueo si NO ha iniciado sesión con cuenta registrada -->
+                    <div id="uReviewAuthRequiredBox" class="bg-[#F6F6F6] border border-zinc-200 rounded-[24px] p-6 text-center space-y-4">
+                        <div class="w-14 h-14 rounded-full bg-[#2B2B2B] text-white flex items-center justify-center mx-auto shadow">
+                            <i class="fa-solid fa-user-lock text-lg"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-base font-extrabold text-[#141414]">Solo usuarios con cuenta registrada pueden comentar</h4>
+                            <p class="text-xs text-zinc-500 mt-1 max-w-md mx-auto leading-relaxed">
+                                Para publicar una reseña sobre una prenda o conjunto en {{ store_settings.store_name }}, primero debes iniciar sesión con tu cuenta registrada o crear una gratis.
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap items-center justify-center gap-3 pt-1">
+                            <button type="button" onclick="openAuthSubTab('login')"
+                                    class="px-5 py-2.5 rounded-full bg-[#2B2B2B] hover:bg-black text-white text-xs font-bold transition shadow">
+                                Iniciar Sesión
+                            </button>
+                            <button type="button" onclick="openAuthSubTab('register')"
+                                    class="px-5 py-2.5 rounded-full border border-zinc-300 bg-white hover:bg-zinc-100 text-[#141414] text-xs font-bold transition">
+                                Crear Cuenta Registrada
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Formulario de reseña (Visible SOLO cuando el usuario tiene sesión iniciada) -->
+                    <form id="userGlobalReviewForm" onsubmit="submitGlobalReview(event)" class="hidden space-y-4">
+                        <div class="bg-[#F6F6F6] rounded-2xl p-4 flex items-center justify-between border border-zinc-200/80">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold">
+                                    <i class="fa-solid fa-check"></i>
+                                </span>
+                                <div>
+                                    <p class="text-xs font-extrabold text-[#141414]">
+                                        Comentando como: <span id="uRevLoggedName">Usuario</span>
+                                    </p>
+                                    <p class="text-[11px] text-emerald-700 font-semibold">Cuenta Registrada Verificada</p>
+                                </div>
+                            </div>
+                            <span class="text-amber-500 text-base font-bold">★★★★★</span>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-zinc-700 mb-1">Selecciona la Prenda o Conjunto *</label>
+                            <select id="uRevProductSelect" required
+                                    class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:outline-none focus:bg-white focus:border-[#2B2B2B] font-semibold">
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-700 mb-1">Talla Comprada</label>
+                                <select id="uRevSize" class="w-full px-3.5 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:outline-none">
+                                    <option value="XS">Talla XS</option>
+                                    <option value="S" selected>Talla S</option>
+                                    <option value="M">Talla M</option>
+                                    <option value="L">Talla L</option>
+                                    <option value="XL">Talla XL</option>
+                                    <option value="Única">Talla Única</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-700 mb-1">¿Cómo te quedó la prenda?</label>
+                                <select id="uRevFit" class="w-full px-3.5 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:outline-none">
+                                    <option value="Fiel a la talla" selected>Fiel a la talla</option>
+                                    <option value="Horma perfecta">Horma perfecta</option>
+                                    <option value="Ajustado moldeador">Ajustado moldeador</option>
+                                    <option value="Holgado">Holgado</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Selector Interactivo de Estrellas (1 a 5) -->
+                        <div>
+                            <label class="block text-xs font-bold text-zinc-700 mb-1.5">Calificación *</label>
+                            <input type="hidden" id="uRevRating" value="5">
+                            <div class="flex items-center gap-2" id="uRevStarsPicker">
+                                <button type="button" onclick="setGlobalReviewStars(1)" class="text-2xl text-amber-400 hover:scale-110 transition">★</button>
+                                <button type="button" onclick="setGlobalReviewStars(2)" class="text-2xl text-amber-400 hover:scale-110 transition">★</button>
+                                <button type="button" onclick="setGlobalReviewStars(3)" class="text-2xl text-amber-400 hover:scale-110 transition">★</button>
+                                <button type="button" onclick="setGlobalReviewStars(4)" class="text-2xl text-amber-400 hover:scale-110 transition">★</button>
+                                <button type="button" onclick="setGlobalReviewStars(5)" class="text-2xl text-amber-400 hover:scale-110 transition">★</button>
+                                <span id="uRevStarsText" class="text-xs font-bold text-zinc-600 ml-2">5/5 Excelente</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-zinc-700 mb-1">Tu Reseña de la Prenda o Conjunto *</label>
+                            <textarea id="uRevComment" rows="3" required
+                                      placeholder="Cuéntanos qué te pareció la calidad de la tela, el color y cómo horma el conjunto..."
+                                      class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:outline-none focus:bg-white focus:border-[#2B2B2B]"></textarea>
+                        </div>
+
+                        <button type="submit" id="btnSubmitGlobalReview"
+                                class="w-full py-3.5 rounded-full bg-[#2B2B2B] hover:bg-black text-white font-bold text-xs sm:text-sm tracking-wide transition shadow-md">
+                            Publicar Reseña
+                        </button>
+                    </form>
+                </div>
+
+                <!-- TAB 2: TODAS LAS RESEÑAS DE USUARIOS REGISTRADOS -->
+                <div id="uTabPanel-all-reviews" class="hidden space-y-3">
+                    <div id="uAllReviewsContainer" class="space-y-3"></div>
+                </div>
+
+                <!-- TAB 3: MI CUENTA (INICIAR SESIÓN / REGISTRO / PERFIL DE USUARIO) -->
+                <div id="uTabPanel-profile" class="hidden">
+                    
+                    <!-- A. VISTA PARA INVITADOS (INICIAR SESIÓN O CREAR CUENTA) -->
+                    <div id="uAccountGuestBox" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-2 p-1 bg-[#F3F3F3] rounded-full">
+                            <button type="button" id="btnSwitchAuthLogin" onclick="toggleGuestAuthForm('login')"
+                                    class="py-2 rounded-full bg-[#2B2B2B] text-white text-xs font-bold transition">
+                                Iniciar Sesión
+                            </button>
+                            <button type="button" id="btnSwitchAuthRegister" onclick="toggleGuestAuthForm('register')"
+                                    class="py-2 rounded-full text-zinc-600 hover:text-black text-xs font-bold transition">
+                                Crear Cuenta
+                            </button>
+                        </div>
+
+                        <!-- Alerta de error/éxito de autenticación -->
+                        <div id="uAuthFeedback" class="hidden p-3 rounded-2xl text-xs font-bold text-center"></div>
+
+                        <!-- Formulario 1: Iniciar Sesión -->
+                        <form id="uLoginForm" onsubmit="submitUserLogin(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-700 mb-1">Usuario o Correo Electrónico *</label>
+                                <input type="text" id="loginUsername" required placeholder="Ej: camila"
+                                       class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:bg-white focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-700 mb-1">Contraseña *</label>
+                                <input type="password" id="loginPassword" required placeholder="Ingresa tu contraseña"
+                                       class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:bg-white focus:outline-none">
+                            </div>
+
+                            <!-- Cuenta registrada de demostración para prueba rápida -->
+                            <div class="p-3 rounded-2xl bg-[#F6F6F6] border border-zinc-200/80 flex items-center justify-between text-xs">
+                                <span class="text-zinc-500">Cuenta registrada de prueba: <strong class="text-[#141414]">camila / 1234</strong></span>
+                                <button type="button" onclick="fillDemoCustomerLogin()"
+                                        class="px-2.5 py-1 rounded-full bg-white border border-zinc-300 text-[#141414] font-bold text-[11px] hover:bg-zinc-100">
+                                    Autocompletar
+                                </button>
+                            </div>
+
+                            <button type="submit" id="btnSubmitLogin"
+                                    class="w-full py-3.5 rounded-full bg-[#2B2B2B] hover:bg-black text-white font-bold text-xs sm:text-sm transition shadow-md">
+                                Iniciar Sesión en {{ store_settings.store_name }}
+                            </button>
+                        </form>
+
+                        <!-- Formulario 2: Crear Cuenta Registrada -->
+                        <form id="uRegisterForm" onsubmit="submitUserRegister(event)" class="hidden space-y-3.5">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-zinc-700 mb-1">Nombre y Apellido *</label>
+                                    <input type="text" id="regName" required placeholder="Ej: Valeria Gómez"
+                                           class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:bg-white focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-zinc-700 mb-1">Nombre de Usuario *</label>
+                                    <input type="text" id="regUsername" required placeholder="Ej: valeria"
+                                           class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:bg-white focus:outline-none">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-zinc-700 mb-1">Correo Electrónico</label>
+                                    <input type="email" id="regEmail" placeholder="Ej: valeria@correo.com"
+                                           class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:bg-white focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-zinc-700 mb-1">Contraseña * (mín. 4 caracteres)</label>
+                                    <input type="password" id="regPassword" required placeholder="Crea tu contraseña"
+                                           class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:bg-white focus:outline-none">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-zinc-700 mb-1">Teléfono / WhatsApp</label>
+                                    <input type="text" id="regPhone" placeholder="0412-1234567"
+                                           class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:bg-white focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-zinc-700 mb-1">Ciudad</label>
+                                    <input type="text" id="regCity" placeholder="Ej: Caracas"
+                                           class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:bg-white focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-zinc-700 mb-1">Talla Habitual</label>
+                                    <select id="regSize" class="w-full px-3.5 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:bg-white focus:outline-none">
+                                        <option value="XS">Talla XS</option>
+                                        <option value="S" selected>Talla S</option>
+                                        <option value="M">Talla M</option>
+                                        <option value="L">Talla L</option>
+                                        <option value="XL">Talla XL</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button type="submit" id="btnSubmitRegister"
+                                    class="w-full py-3.5 rounded-full bg-[#2B2B2B] hover:bg-black text-white font-bold text-xs sm:text-sm transition shadow-md">
+                                Crear Mi Cuenta y Comentar
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- B. VISTA PARA USUARIO CON SESIÓN INICIADA -->
+                    <div id="uAccountLoggedBox" class="hidden space-y-4">
+                        <div class="bg-[#F6F6F6] rounded-2xl p-4 flex items-center justify-between border border-zinc-200">
+                            <div>
+                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold mb-1">
+                                    <i class="fa-solid fa-circle-check"></i> Cuenta Registrada Activa
+                                </span>
+                                <h4 id="profLoggedFullName" class="text-base font-extrabold text-[#141414]">Usuario</h4>
+                                <p id="profLoggedUsername" class="text-xs text-zinc-500">@usuario</p>
+                            </div>
+                            <button type="button" onclick="logoutCustomerUser()"
+                                    class="px-4 py-2 rounded-full border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition">
+                                <i class="fa-solid fa-right-from-bracket mr-1"></i> Cerrar Sesión
+                            </button>
+                        </div>
+
+                        <form onsubmit="saveUserProfile(event)" class="space-y-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-zinc-700 mb-1">Nombre y Apellido *</label>
+                                    <input type="text" id="profName" required
+                                           class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:bg-white focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-zinc-700 mb-1">Teléfono / WhatsApp</label>
+                                    <input type="text" id="profPhone"
+                                           class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:bg-white focus:outline-none">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-zinc-700 mb-1">Ciudad / Estado</label>
+                                    <input type="text" id="profCity"
+                                           class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:bg-white focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-zinc-700 mb-1">Tu Talla Habitual</label>
+                                    <select id="profSize" class="w-full px-4 py-2.5 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:bg-white focus:outline-none">
+                                        <option value="XS">Talla XS</option>
+                                        <option value="S">Talla S</option>
+                                        <option value="M">Talla M</option>
+                                        <option value="L">Talla L</option>
+                                        <option value="XL">Talla XL</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button type="submit" id="btnSaveProfile"
+                                    class="w-full py-3.5 rounded-full bg-[#2B2B2B] hover:bg-black text-white font-bold text-xs sm:text-sm transition shadow-md">
+                                Guardar Cambios en Mi Cuenta
+                            </button>
+                        </form>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.STORE_CONFIG = {
+            currencySymbol: "{{ store_settings.currency_symbol|escapejs }}",
+            bcvRate: parseFloat("{{ store_settings.bcv_rate|default:'45.80' }}".replace(',', '.')) || 45.80,
+            combineWholesale: {{ store_settings.combine_wholesale_enabled|yesno:"true,false" }},
+            globalMinUnits: parseInt("{{ store_settings.global_wholesale_min_units|default:'6' }}"),
+            ownerPhone: "{{ store_settings.owner_phone|escapejs }}",
+            storeName: "{{ store_settings.store_name|escapejs }}"
+        };
+        window.CURRENT_USER = {{ current_user_json|default:'{"is_authenticated": false}'|safe }};
+    </script>
+    <script src="{% static 'js/cart.js' %}"></script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Crear Cuenta | {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="min-h-[75vh] flex items-center justify-center px-4 py-10">
+    <div class="bg-white rounded-[30px] border border-zinc-200/80 shadow-xl max-w-md w-full p-7 sm:p-8">
+        
+        <div class="text-center mb-6">
+            <img src="{% static 'img/shibui_logo.png' %}" alt="{{ store_settings.store_name }}"
+                 class="w-16 h-16 object-contain mx-auto mb-3 rounded-2xl border border-zinc-100 p-1 shadow-2xs">
+            <h1 class="text-xl font-extrabold text-[#141414]">Crear Cuenta</h1>
+            <p class="text-xs text-zinc-500 mt-1">Completa tus datos para poder comentar las prendas del catálogo</p>
+        </div>
+
+        {% if error %}
+        <div class="mb-4 p-3 rounded-2xl bg-red-50 border border-red-200 text-xs font-bold text-red-700 text-center">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{% url 'catalog:customer_register' %}" class="space-y-4">
+            {% csrf_token %}
+            <div>
+                <label class="block text-xs font-bold text-zinc-700 mb-1">Nombre y Apellido *</label>
+                <input type="text" name="name" required placeholder="Ej: Camila Rodríguez"
+                       class="w-full px-4 py-3 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:outline-none focus:bg-white focus:border-[#2B2B2B]">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-zinc-700 mb-1">Correo Electrónico *</label>
+                <input type="email" name="email" required placeholder="Ej: camila@correo.com"
+                       class="w-full px-4 py-3 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:outline-none focus:bg-white focus:border-[#2B2B2B]">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-zinc-700 mb-1">Número de Teléfono / WhatsApp *</label>
+                <input type="text" name="phone" required placeholder="Ej: 0412-5551020"
+                       class="w-full px-4 py-3 text-sm bg-[#F6F6F6] border border-zinc-200 rounded-2xl focus:outline-none focus:bg-white focus:border-[#2B2B2B]">
+            </div>
+
+            <button type="submit"
+                    class="w-full py-3.5 rounded-full bg-[#2B2B2B] hover:bg-black text-white font-bold text-sm transition shadow-md">
+                Registrarme
+            </button>
+        </form>
+
+        <div class="mt-6 pt-5 border-t border-zinc-100 text-center">
+            <p class="text-xs text-zinc-500">
+                ¿Ya tienes una cuenta registrada?
+                <a href="{% url 'catalog:customer_login' %}" class="font-extrabold text-[#141414] underline ml-1">
+                    Iniciar Sesión
+                </a>
+            </p>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

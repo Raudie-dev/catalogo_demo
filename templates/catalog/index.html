@@ -1,0 +1,838 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ store_settings.store_name }} | Catálogo{% endblock %}
+
+{% block content %}
+<!-- Contenedor Principal Estilo Catálogo Editorial -->
+<div class="max-w-6xl mx-auto px-3 sm:px-6 pt-4 pb-10">
+
+    <!-- Buscador Móvil -->
+    <div class="sm:hidden mb-4">
+        <form action="{% url 'catalog:index' %}" method="GET" class="relative flex items-center">
+            <i class="fa-solid fa-magnifying-glass text-zinc-400 text-sm absolute left-4"></i>
+            <input type="text" name="q" value="{{ search_query|default:'' }}"
+                   placeholder="Buscar prendas en {{ store_settings.store_name }}..."
+                   class="w-full h-11 pl-10 pr-10 rounded-full bg-white border border-zinc-200 text-sm text-[#141414] placeholder-zinc-400 focus:outline-none">
+            <button type="submit" class="absolute right-4 text-zinc-500">
+                <i class="fa-solid fa-sliders text-xs"></i>
+            </button>
+        </form>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- 1. BARRA DE CATEGORÍAS EN CÍRCULOS                                  -->
+    <!-- =================================================================== -->
+    <div class="bg-white rounded-[28px] p-4 sm:p-5 shadow-xs border border-zinc-200/60 mb-5">
+        <div class="flex items-center gap-3 sm:gap-5 overflow-x-auto no-scrollbar py-1">
+            
+            <!-- Todo -->
+            <a href="{% url 'catalog:index' %}"
+               class="cat-circle-item {% if current_category == 'todas' and not only_immediate and not only_wholesale %}active{% endif %}">
+                <div class="cat-circle-icon">
+                    <i class="fa-solid fa-border-all"></i>
+                </div>
+                <span class="text-xs font-bold tracking-tight text-[#141414]">Todo</span>
+            </a>
+
+            <!-- Entrega Inmediata -->
+            <a href="?disponible={% if only_immediate %}0{% else %}1{% endif %}{% if current_category != 'todas' %}&categoria={{ current_category }}{% endif %}"
+               class="cat-circle-item {% if only_immediate %}active{% endif %}">
+                <div class="cat-circle-icon">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+                <span class="text-xs font-semibold text-zinc-700 whitespace-nowrap">Disponible</span>
+            </a>
+
+            <!-- Categorías dinámicas con imagen o foto configurada -->
+            {% for cat in categories %}
+            <a href="?categoria={{ cat.slug }}"
+               class="cat-circle-item {% if current_category == cat.slug %}active{% endif %}"
+               title="Ver prendas de {{ cat.name }}">
+                <div class="cat-circle-icon overflow-hidden">
+                    {% if cat.get_image_url %}
+                        <img src="{{ cat.get_image_url }}" alt="{{ cat.name }}" class="w-full h-full object-cover rounded-full p-0.5">
+                    {% else %}
+                        <span class="text-xs font-extrabold text-stone-500 uppercase">{{ cat.name|slice:":2" }}</span>
+                    {% endif %}
+                </div>
+                <span class="text-xs font-semibold text-zinc-700 whitespace-nowrap">{{ cat.name }}</span>
+            </a>
+            {% endfor %}
+
+            <!-- Rebajas Al Mayor -->
+            <a href="?solo_mayor={% if only_wholesale %}0{% else %}1{% endif %}"
+               class="cat-circle-item {% if only_wholesale %}active{% endif %}">
+                <div class="cat-circle-icon">
+                    <i class="fa-solid fa-percent"></i>
+                </div>
+                <span class="text-xs font-semibold text-zinc-700 whitespace-nowrap">Al Mayor</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- 2. BANNER PUBLICITARIO / DESCUENTO A ANCHO COMPLETO (100%)           -->
+    <!-- =================================================================== -->
+    {% if not search_query and current_category == 'todas' and store_settings.promo_banner_active %}
+    {% with featured=products.0 %}
+    <div class="mb-8">
+        <!-- Banner Destacado Oscuro con Cuadrícula Sutil a 100% de Ancho -->
+        <div onclick="handlePromoBannerClick()"
+             class="w-full dark-grid-surface rounded-[30px] p-6 sm:p-10 text-white relative overflow-hidden cursor-pointer group flex flex-col justify-between min-h-[280px] sm:min-h-[310px] shadow-lg transition hover:shadow-xl">
+            
+            <div class="relative z-10 max-w-[68%] sm:max-w-[55%]">
+                <!-- Mini Logo / Badge de Descuento o Colección -->
+                <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur-xs px-3.5 py-1 rounded-full mb-3.5 border border-white/15">
+                    <img src="/static/img/shibui_logo.png" alt="Logo" class="w-4 h-4 rounded-full bg-white object-contain">
+                    <span id="homePromoBadgeText" class="text-[11px] font-bold uppercase tracking-widest text-zinc-200">
+                        {{ store_settings.promo_badge|default:"COLECCIÓN DESTACADA" }}
+                    </span>
+                </div>
+
+                <h2 id="homePromoTitleText" class="text-2xl sm:text-4xl font-extrabold leading-tight tracking-tight">
+                    {% if store_settings.promo_title %}{{ store_settings.promo_title }}{% elif featured %}{{ featured.name }}{% else %}Colección Exclusiva{% endif %}
+                </h2>
+
+                <div class="mt-3 flex flex-wrap items-baseline gap-2.5">
+                    <span id="homePromoPriceText" class="text-2xl sm:text-3xl font-extrabold text-white">
+                        {% if store_settings.promo_price %}{{ store_settings.promo_price }}{% elif featured %}{{ store_settings.currency_symbol }}{{ featured.price_retail|floatformat:0 }}{% endif %}
+                    </span>
+                    <span id="homePromoPriceNoteText" class="text-xs sm:text-sm text-zinc-400">
+                        {% if store_settings.promo_price_note %}{{ store_settings.promo_price_note }}{% elif featured %}/ Tallas Disponibles{% endif %}
+                    </span>
+                </div>
+
+                <p id="homePromoWholesaleText" class="text-xs sm:text-sm text-zinc-300 mt-1.5 font-medium">
+                    {% if store_settings.promo_wholesale_note %}
+                        {{ store_settings.promo_wholesale_note }}
+                    {% elif featured %}
+                        Al Mayor: <strong class="text-white">{{ store_settings.currency_symbol }}{{ featured.price_wholesale|floatformat:2 }}</strong> (desde {{ featured.wholesale_min_qty }} uds)
+                    {% endif %}
+                </p>
+
+                <div class="mt-6 flex items-center gap-3">
+                    <button type="button" id="homePromoBtnText"
+                            class="px-6 py-3 rounded-full bg-white text-[#141414] font-extrabold text-xs sm:text-sm tracking-wide group-hover:scale-105 transition shadow-md">
+                        {{ store_settings.promo_button_text|default:"Comprar Ahora" }}
+                    </button>
+                    <span class="text-xs text-zinc-300 hidden sm:inline font-semibold">Ver detalles →</span>
+                </div>
+            </div>
+
+            <!-- Imagen Derecha Estilo Recorte Hero -->
+            <div class="absolute right-0 top-0 bottom-0 w-[42%] sm:w-[46%] overflow-hidden pointer-events-none">
+                <img id="homePromoImg"
+                     src="{% if store_settings.promo_image_url %}{{ store_settings.promo_image_url }}{% elif store_settings.promo_product %}{{ store_settings.promo_product.image_url }}{% elif featured %}{{ featured.image_url }}{% endif %}"
+                     alt="Publicidad"
+                     class="w-full h-full object-cover object-center opacity-95 group-hover:scale-105 transition duration-500"
+                     style="mask-image: linear-gradient(to right, transparent 0%, black 24%); -webkit-mask-image: linear-gradient(to right, transparent 0%, black 24%);">
+            </div>
+        </div>
+    </div>
+    {% endwith %}
+    {% endif %}
+
+    <!-- =================================================================== -->
+    <!-- BARRA Y PANEL DE FILTROS ACTIVABLE (COMPACTO Y ULTRA RÁPIDO)        -->
+    <!-- =================================================================== -->
+    <div class="mb-6 space-y-3">
+        
+        <!-- BARRA SLIM COMPACTA (Visible siempre, ocupa mínimo espacio) -->
+        <div class="bg-white rounded-2xl p-2.5 sm:p-3 border border-zinc-200/80 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
+            
+            <!-- Botón Principal "Filtros" + Chips Rápidos -->
+            <div class="flex items-center gap-2 flex-wrap min-w-0">
+                <!-- Botón Activar / Desplegar Filtros -->
+                <button type="button" onclick="toggleFilterPanel()"
+                        class="px-4 py-2 rounded-xl bg-[#141414] hover:bg-black text-white text-xs font-bold transition flex items-center gap-2 shadow-xs shrink-0 cursor-pointer">
+                    <i class="fa-solid fa-sliders text-xs text-amber-400"></i>
+                    <span>Filtros</span>
+                    {% if active_filters_count > 0 %}
+                    <span class="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-black">
+                        {{ active_filters_count }}
+                    </span>
+                    {% endif %}
+                    <i id="filterBarChevron" class="fa-solid fa-chevron-down text-[10px] text-zinc-400 transition-transform duration-300"></i>
+                </button>
+
+                <!-- Chips Descartables de Filtros Activos en la misma barra -->
+                {% if active_filters_count > 0 or search_query %}
+                <div class="flex items-center gap-1.5 flex-wrap overflow-x-auto py-0.5">
+                    {% if search_query %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 text-[#141414] text-[11px] font-bold border border-zinc-200">
+                        <span>"{{ search_query }}"</span>
+                        <button type="button" onclick="applyCatalogFilter('q', '')" class="hover:text-red-500 font-black text-xs leading-none">&times;</button>
+                    </span>
+                    {% endif %}
+
+                    {% if current_category != 'todas' %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 text-[#141414] text-[11px] font-bold border border-zinc-200">
+                        <span>{{ current_category }}</span>
+                        <button type="button" onclick="applyCatalogFilter('categoria', 'todas')" class="hover:text-red-500 font-black text-xs leading-none">&times;</button>
+                    </span>
+                    {% endif %}
+
+                    {% if current_size != 'todas' %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 text-[#141414] text-[11px] font-bold border border-zinc-200">
+                        <span>Talla {{ current_size }}</span>
+                        <button type="button" onclick="applyCatalogFilter('talla', 'todas')" class="hover:text-red-500 font-black text-xs leading-none">&times;</button>
+                    </span>
+                    {% endif %}
+
+                    {% if current_color != 'todos' %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 text-[#141414] text-[11px] font-bold border border-zinc-200">
+                        <span>Color {{ current_color }}</span>
+                        <button type="button" onclick="applyCatalogFilter('color', 'todos')" class="hover:text-red-500 font-black text-xs leading-none">&times;</button>
+                    </span>
+                    {% endif %}
+
+                    {% if only_wholesale %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 text-[#141414] text-[11px] font-bold border border-zinc-200">
+                        <span>🔥 Al Mayor</span>
+                        <button type="button" onclick="applyCatalogFilter('solo_mayor', '0')" class="hover:text-red-500 font-black text-xs leading-none">&times;</button>
+                    </span>
+                    {% endif %}
+
+                    {% if only_immediate %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 text-[#141414] text-[11px] font-bold border border-zinc-200">
+                        <span>⚡ Inmediata</span>
+                        <button type="button" onclick="applyCatalogFilter('disponible', '0')" class="hover:text-red-500 font-black text-xs leading-none">&times;</button>
+                    </span>
+                    {% endif %}
+
+                    {% if price_max and price_max != '100' %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 text-[#141414] text-[11px] font-bold border border-zinc-200">
+                        <span>Hasta ${{ price_max }}</span>
+                        <button type="button" onclick="applyCatalogFilter('precio_max', '')" class="hover:text-red-500 font-black text-xs leading-none">&times;</button>
+                    </span>
+                    {% endif %}
+
+                    <!-- Botón Limpiar Todo -->
+                    <button type="button" onclick="resetAllFilters()"
+                            class="px-2 py-1 text-[11px] font-bold text-red-600 hover:text-red-800 hover:underline">
+                        Limpiar todo
+                    </button>
+                </div>
+                {% else %}
+                <span class="text-xs text-zinc-400 hidden sm:inline">
+                    Toca para filtrar por talla, color o precio
+                </span>
+                {% endif %}
+            </div>
+
+            <!-- Contador de Prendas a la derecha -->
+            <div class="text-xs text-zinc-500 font-medium shrink-0 ml-auto pr-1">
+                <strong class="text-[#141414] font-extrabold">{{ products|length }}</strong> prendas
+            </div>
+        </div>
+
+        <!-- PANEL DESPLEGABLE (Oculto por defecto en móvil y PC, se activa con un clic) -->
+        <div id="filterPanelContent" class="hidden bg-white rounded-3xl p-5 sm:p-6 border border-zinc-200 shadow-lg transition-all">
+            
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-zinc-100">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <h4 class="text-xs font-extrabold text-[#141414] uppercase tracking-wider">Opciones de Filtrado</h4>
+                </div>
+                <button type="button" onclick="toggleFilterPanel()" class="text-xs font-bold text-zinc-400 hover:text-black flex items-center gap-1">
+                    <span>Cerrar</span>
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <div class="space-y-5">
+                
+                <!-- Fila 1: Tallas y Modalidades -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                    
+                    <!-- Selector de Tallas -->
+                    <div class="lg:col-span-7 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-extrabold text-[#141414] uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-ruler-combined text-zinc-500 text-[11px]"></i>
+                                <span>Talla</span>
+                            </label>
+                            {% if current_size != 'todas' %}
+                            <button type="button" onclick="applyCatalogFilter('talla', 'todas')" class="text-[11px] text-zinc-400 hover:text-black underline font-medium">
+                                Quitar talla
+                            </button>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="flex flex-wrap gap-1.5 sm:gap-2">
+                            <button type="button" onclick="applyCatalogFilter('talla', 'todas')"
+                                    class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if current_size == 'todas' %}bg-[#141414] text-white shadow-xs{% else %}bg-[#F5F5F5] text-zinc-700 hover:bg-zinc-200 border border-zinc-200/70{% endif %}">
+                                Todas
+                            </button>
+                            {% for s in sizes %}
+                            <button type="button" onclick="applyCatalogFilter('talla', '{{ s.name|escapejs }}')"
+                                    class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if current_size == s.name %}bg-[#141414] text-white shadow-xs ring-2 ring-[#141414]{% else %}bg-[#F5F5F5] text-zinc-700 hover:bg-zinc-200 border border-zinc-200/70{% endif %}">
+                                {{ s.name }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Modalidad y Disponibilidad -->
+                    <div class="lg:col-span-5 space-y-2">
+                        <label class="text-xs font-extrabold text-[#141414] uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fa-solid fa-bolt text-amber-500 text-[11px]"></i>
+                            <span>Modalidad & Entrega</span>
+                        </label>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <!-- Toggle Al Mayor -->
+                            <button type="button"
+                                    onclick="applyCatalogFilter('solo_mayor', '{% if only_wholesale %}0{% else %}1{% endif %}')"
+                                    class="p-2.5 rounded-xl border text-left transition flex items-center justify-between {% if only_wholesale %}bg-[#141414] text-white border-[#141414] shadow-xs{% else %}bg-[#F5F5F5] text-zinc-800 border-zinc-200/80 hover:border-zinc-400{% endif %}">
+                                <div class="min-w-0 pr-1">
+                                    <span class="block text-xs font-extrabold truncate">🔥 Al Mayor</span>
+                                    <span class="block text-[10px] {% if only_wholesale %}text-zinc-300{% else %}text-zinc-500{% endif %} truncate">Precios por bulto</span>
+                                </div>
+                                <span class="w-4 h-4 rounded-full flex items-center justify-center shrink-0 text-[10px] {% if only_wholesale %}bg-white text-black font-black{% else %}border border-zinc-400 text-transparent{% endif %}">✓</span>
+                            </button>
+
+                            <!-- Toggle Entrega Inmediata -->
+                            <button type="button"
+                                    onclick="applyCatalogFilter('disponible', '{% if only_immediate %}0{% else %}1{% endif %}')"
+                                    class="p-2.5 rounded-xl border text-left transition flex items-center justify-between {% if only_immediate %}bg-[#141414] text-white border-[#141414] shadow-xs{% else %}bg-[#F5F5F5] text-zinc-800 border-zinc-200/80 hover:border-zinc-400{% endif %}">
+                                <div class="min-w-0 pr-1">
+                                    <span class="block text-xs font-extrabold truncate">⚡ Inmediata</span>
+                                    <span class="block text-[10px] {% if only_immediate %}text-zinc-300{% else %}text-zinc-500{% endif %} truncate">En stock hoy</span>
+                                </div>
+                                <span class="w-4 h-4 rounded-full flex items-center justify-center shrink-0 text-[10px] {% if only_immediate %}bg-white text-black font-black{% else %}border border-zinc-400 text-transparent{% endif %}">✓</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Fila 2: Paleta de Colores y Rango de Precio -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start pt-3 border-t border-zinc-100">
+                    
+                    <!-- Selector de Colores -->
+                    <div class="lg:col-span-7 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-extrabold text-[#141414] uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-palette text-zinc-500 text-[11px]"></i>
+                                <span>Color</span>
+                            </label>
+                            {% if current_color != 'todos' %}
+                            <button type="button" onclick="applyCatalogFilter('color', 'todos')" class="text-[11px] text-zinc-400 hover:text-black underline font-medium">
+                                Quitar color
+                            </button>
+                            {% endif %}
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                            <!-- Todos los colores -->
+                            <button type="button" onclick="applyCatalogFilter('color', 'todos')"
+                                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 {% if current_color == 'todos' %}bg-[#141414] text-white shadow-xs{% else %}bg-[#F5F5F5] text-zinc-700 hover:bg-zinc-200 border border-zinc-200/70{% endif %}">
+                                <span class="w-3.5 h-3.5 rounded-full bg-gradient-to-tr from-rose-500 via-amber-400 to-indigo-500 shadow-2xs"></span>
+                                <span>Todos</span>
+                            </button>
+
+                            {% for c in colors %}
+                            <button type="button" onclick="applyCatalogFilter('color', '{{ c.name|escapejs }}')"
+                                    title="{{ c.name }}"
+                                    class="group relative px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 {% if current_color == c.name %}bg-[#141414] text-white shadow-xs ring-2 ring-[#141414]{% else %}bg-[#F5F5F5] text-zinc-700 hover:bg-zinc-200 border border-zinc-200/70{% endif %}">
+                                <span class="w-3.5 h-3.5 rounded-full border border-black/20 shadow-2xs shrink-0" style="background-color: {{ c.hex_code }};"></span>
+                                <span>{{ c.name }}</span>
+                                {% if current_color == c.name %}
+                                <span class="text-[10px] font-black text-emerald-400">✓</span>
+                                {% endif %}
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Presupuesto Máximo -->
+                    <div class="lg:col-span-5 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-extrabold text-[#141414] uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-tag text-zinc-500 text-[11px]"></i>
+                                <span>Presupuesto Máximo</span>
+                            </label>
+                            <span class="text-xs font-bold text-[#141414]">
+                                {% if price_max and price_max != '100' %}Hasta ${{ price_max }} USD{% else %}Sin límite{% endif %}
+                            </span>
+                        </div>
+
+                        <div class="flex flex-wrap gap-1.5">
+                            <button type="button" onclick="applyCatalogFilter('precio_max', '')"
+                                    class="px-2.5 py-1.5 rounded-xl text-xs font-bold transition {% if not price_max or price_max == '100' %}bg-[#141414] text-white shadow-xs{% else %}bg-[#F5F5F5] text-zinc-700 hover:bg-zinc-200 border border-zinc-200/70{% endif %}">
+                                Todos
+                            </button>
+                            <button type="button" onclick="applyCatalogFilter('precio_max', '15')"
+                                    class="px-2.5 py-1.5 rounded-xl text-xs font-bold transition {% if price_max == '15' %}bg-[#141414] text-white shadow-xs{% else %}bg-[#F5F5F5] text-zinc-700 hover:bg-zinc-200 border border-zinc-200/70{% endif %}">
+                                Hasta $15
+                            </button>
+                            <button type="button" onclick="applyCatalogFilter('precio_max', '25')"
+                                    class="px-2.5 py-1.5 rounded-xl text-xs font-bold transition {% if price_max == '25' %}bg-[#141414] text-white shadow-xs{% else %}bg-[#F5F5F5] text-zinc-700 hover:bg-zinc-200 border border-zinc-200/70{% endif %}">
+                                Hasta $25
+                            </button>
+                            <button type="button" onclick="applyCatalogFilter('precio_max', '35')"
+                                    class="px-2.5 py-1.5 rounded-xl text-xs font-bold transition {% if price_max == '35' %}bg-[#141414] text-white shadow-xs{% else %}bg-[#F5F5F5] text-zinc-700 hover:bg-zinc-200 border border-zinc-200/70{% endif %}">
+                                Hasta $35
+                            </button>
+                            <button type="button" onclick="applyCatalogFilter('precio_max', '50')"
+                                    class="px-2.5 py-1.5 rounded-xl text-xs font-bold transition {% if price_max == '50' %}bg-[#141414] text-white shadow-xs{% else %}bg-[#F5F5F5] text-zinc-700 hover:bg-zinc-200 border border-zinc-200/70{% endif %}">
+                                Hasta $50
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Botón inferior para cerrar y ver prendas -->
+            <div class="mt-5 pt-4 border-t border-zinc-100 flex items-center justify-between gap-3">
+                <button type="button" onclick="resetAllFilters()" class="text-xs font-semibold text-zinc-500 hover:text-red-600">
+                    Restablecer todo
+                </button>
+                <button type="button" onclick="toggleFilterPanel()"
+                        class="px-5 py-2.5 rounded-xl bg-[#141414] hover:bg-black text-white text-xs font-extrabold transition shadow-xs flex items-center gap-2">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Ver {{ products|length }} Prendas</span>
+                </button>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- 3. GRILLA BENTO DE PRENDAS (Tarjetas Claras y Oscuras Alternadas)   -->
+    <!-- =================================================================== -->
+    <div class="bg-white rounded-[32px] p-4 sm:p-6 shadow-xs border border-zinc-200/60">
+        <div class="flex items-center justify-between mb-4 px-1">
+            <div>
+                <h3 class="text-lg sm:text-xl font-extrabold text-[#141414] tracking-tight">Colección del Catálogo</h3>
+                <p class="text-xs text-zinc-400">Selecciona una prenda para elegir talla, color y ver precios al mayor</p>
+            </div>
+            <span class="text-xs font-bold text-zinc-500 bg-[#F3F3F3] px-3 py-1.5 rounded-full">
+                {{ products|length }} modelos
+            </span>
+        </div>
+
+        {% if products %}
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-5">
+            {% for product in products %}
+            {% cycle 'light' 'dark' 'light' 'light' as card_theme silent %}
+            
+            <article onclick="openProductDetailModal({{ product.id }})"
+                     class="{% if card_theme == 'dark' %}st-card-dark{% else %}st-card-light{% endif %} p-3.5 sm:p-4 flex flex-col justify-between cursor-pointer group relative overflow-hidden">
+                
+                <!-- Cabecera de la tarjeta: Nombre + Tallas Disponibles + Botón '+' -->
+                <div class="flex items-start justify-between gap-2 mb-2.5">
+                    <div class="min-w-0">
+                        <h4 class="font-extrabold text-sm sm:text-base leading-snug truncate {% if card_theme == 'dark' %}text-white{% else %}text-[#141414]{% endif %}">
+                            {{ product.name }}
+                        </h4>
+                        <p class="text-[11px] {% if card_theme == 'dark' %}text-zinc-400{% else %}text-zinc-500{% endif %} truncate mt-0.5">
+                            Tallas: {% for s in product.sizes.all %}{{ s.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                        </p>
+                    </div>
+
+                    <button type="button"
+                            class="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-xs font-bold transition {% if card_theme == 'dark' %}bg-white/15 text-white group-hover:bg-white group-hover:text-black{% else %}bg-white text-[#141414] shadow-2xs group-hover:bg-[#2B2B2B] group-hover:text-white{% endif %}">
+                        <i class="fa-solid fa-plus text-[10px]"></i>
+                    </button>
+                </div>
+
+                <!-- Imagen de la prenda con botón "Comprar" superpuesto -->
+                <div class="relative rounded-2xl overflow-hidden aspect-[4/5] {% if card_theme == 'dark' %}bg-zinc-800{% else %}bg-white{% endif %}">
+                    <img src="{{ product.main_image }}"
+                         alt="{{ product.name }}"
+                         loading="lazy"
+                         class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+
+                    <!-- Etiqueta de Rebaja al Mayor arriba a la izquierda + Calificación a la derecha -->
+                    <div class="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-1">
+                        <span class="rounded-full bg-black/75 backdrop-blur-xs text-white px-2.5 py-0.5 text-[10px] font-bold">
+                            Mayor: {{ store_settings.currency_symbol }}{{ product.price_wholesale|floatformat:2 }} ({{ product.wholesale_min_qty }}+)
+                        </span>
+                        <div class="flex items-center gap-1">
+                            {% if product.gallery_images.count > 1 %}
+                            <span class="rounded-full bg-black/60 backdrop-blur-xs text-white px-2 py-0.5 text-[9px] font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-camera text-[8px]"></i> {{ product.gallery_images.count }}
+                            </span>
+                            {% endif %}
+                            <span class="rounded-full bg-white/90 backdrop-blur-xs text-[#141414] px-2 py-0.5 text-[10px] font-extrabold shadow-2xs flex items-center gap-0.5">
+                                <span class="text-amber-500">★</span> {{ product.avg_rating|floatformat:1 }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Píldora "Comprar" abajo a la izquierda sobre la foto -->
+                    <div class="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between">
+                        <span class="px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-md transition {% if card_theme == 'dark' %}bg-[#2B2B2B]/90 text-white border border-white/20 group-hover:bg-white group-hover:text-black{% else %}bg-[#333333] text-white group-hover:bg-black{% endif %}">
+                            Comprar
+                        </span>
+
+                        <!-- Puntos de color a la derecha -->
+                        <div class="flex items-center gap-1 bg-white/90 backdrop-blur-xs px-2 py-1 rounded-full shadow-2xs">
+                            {% for color in product.colors_preview %}
+                            <span class="w-3 h-3 rounded-full border border-black/20 inline-block"
+                                  style="background-color: {{ color.hex_code }};"
+                                  title="{{ color.name }}"></span>
+                            {% endfor %}
+                            {% if product.extra_colors_count > 0 %}
+                            <span class="text-[9px] font-extrabold text-zinc-700">+{{ product.extra_colors_count }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pie de la tarjeta: Precio Detal vs Precio al Mayor -->
+                <div class="mt-3 pt-2 flex items-center justify-between text-xs">
+                    <div>
+                        <span class="text-[10px] {% if card_theme == 'dark' %}text-zinc-400{% else %}text-zinc-500{% endif %} block">Detal</span>
+                        <span class="font-extrabold text-sm {% if card_theme == 'dark' %}text-white{% else %}text-[#141414]{% endif %}">
+                            {{ store_settings.currency_symbol }}{{ product.price_retail|floatformat:2 }}
+                        </span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] {% if card_theme == 'dark' %}text-zinc-300{% else %}text-zinc-500{% endif %} block">Al Mayor ({{ product.wholesale_min_qty }}+ uds)</span>
+                        <span class="font-extrabold text-sm {% if card_theme == 'dark' %}text-emerald-300{% else %}text-emerald-700{% endif %}">
+                            {{ store_settings.currency_symbol }}{{ product.price_wholesale|floatformat:2 }}
+                        </span>
+                    </div>
+                </div>
+
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-14">
+            <p class="text-base font-bold text-[#141414]">No encontramos prendas con ese filtro</p>
+            <a href="{% url 'catalog:index' %}" class="mt-3 inline-block px-5 py-2.5 rounded-full bg-[#2B2B2B] text-white text-xs font-bold">
+                Ver Todas las Prendas →
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- 4. SECCIÓN DE RESEÑAS DE USUARIOS REGISTRADOS                       -->
+    <!-- =================================================================== -->
+    <div class="bg-white rounded-[32px] p-5 sm:p-6 shadow-xs border border-zinc-200/60 mt-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+                <h3 class="text-lg sm:text-xl font-extrabold text-[#141414] tracking-tight">Reseñas de Clientes · {{ store_settings.store_name }}</h3>
+                <p class="text-xs text-zinc-400">Opiniones de usuarios con cuenta registrada sobre nuestras prendas y conjuntos</p>
+            </div>
+            <a href="{% url 'catalog:customer_account' %}"
+               class="px-4 py-2 rounded-full bg-[#2B2B2B] hover:bg-black text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5">
+                <i class="fa-regular fa-star text-amber-400"></i>
+                <span>Agregar mi Reseña</span>
+            </a>
+        </div>
+
+        <div id="homeRecentReviewsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {% for rev in recent_reviews|slice:":6" %}
+            <div onclick="openProductDetailModal({{ rev.product.id }}, 'reviews')"
+                 class="{% cycle 'bg-[#333333] text-white' 'bg-[#F6F6F6] text-[#141414]' %} rounded-[24px] p-4 flex gap-3.5 items-start cursor-pointer hover:-translate-y-1 transition">
+                <img src="{{ rev.product.image_url }}" alt="{{ rev.product.name }}"
+                     class="w-16 h-20 object-cover rounded-2xl shrink-0">
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center justify-between gap-1">
+                        <span class="text-xs font-extrabold truncate flex items-center gap-1">
+                            {{ rev.author_name }}
+                            <i class="fa-solid fa-circle-check text-[10px] text-emerald-500" title="Cuenta registrada"></i>
+                        </span>
+                        <span class="text-amber-400 text-xs shrink-0">{% for i in "12345" %}{% if forloop.counter <= rev.rating %}★{% else %}☆{% endif %}{% endfor %}</span>
+                    </div>
+                    <p class="text-[11px] opacity-75 truncate mt-0.5">{{ rev.product.name }} · Talla {{ rev.size_purchased }} ({{ rev.fit_feedback }})</p>
+                    <p class="text-xs mt-1.5 line-clamp-2 leading-relaxed opacity-90">"{{ rev.comment }}"</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ======================================================================= -->
+<!-- 5. MODAL DE PRENDA 360° + TALLAS, COLORES Y RESEÑAS EN ESPAÑOL          -->
+<!-- ======================================================================= -->
+<div id="productDetailModal" class="fixed inset-0 bg-black/65 z-50 hidden items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div class="bg-white rounded-[32px] max-w-4xl w-full overflow-hidden shadow-2xl border border-zinc-100 my-auto max-h-[94vh] flex flex-col">
+        
+        <!-- Cabecera del Modal en Español -->
+        <div class="px-6 pt-5 pb-3 flex items-center justify-between bg-white sticky top-0 z-10 border-b border-zinc-100">
+            <button type="button" onclick="closeProductDetailModal()"
+                    class="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-500 hover:text-black transition">
+                <i class="fa-solid fa-chevron-left text-[10px]"></i>
+                <span>Volver</span>
+            </button>
+            <span id="modalProductSku" class="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">REF</span>
+            <button type="button" onclick="cycleNextProductInModal()"
+                    class="text-xs font-bold text-[#141414] hover:underline flex items-center gap-1">
+                <span>Siguiente Prenda</span>
+                <i class="fa-solid fa-rotate text-[10px]"></i>
+            </button>
+        </div>
+
+        <!-- Cuerpo del Modal -->
+        <div class="px-6 py-5 overflow-y-auto grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            
+            <!-- Columna Izquierda: Vitrina con Órbita 360° y Miniaturas -->
+            <div class="md:col-span-6 flex flex-col items-center">
+                <div class="w-full flex items-center justify-between mb-2">
+                    <h2 class="text-2xl font-extrabold text-[#141414] tracking-tight">Detalle de Prenda</h2>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="switchModalTab('reviews')"
+                                class="px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-[#141414] text-[11px] font-extrabold flex items-center gap-1">
+                            <span class="text-amber-500">★</span>
+                            <span id="modalAvgRatingBadge">5.0</span>
+                        </button>
+                        <span id="modalImmediateBadge" class="px-3 py-1 rounded-full bg-[#F3F3F3] text-[#141414] text-[11px] font-bold">
+                            ⚡ Disponible
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Escenario Principal de la Prenda con Anillo 360° debajo -->
+                <div class="relative w-full rounded-[26px] bg-[#F6F6F6] p-4 flex flex-col items-center justify-center">
+                    <img id="modalProductImg" src="" alt=""
+                         class="w-full h-[290px] sm:h-[320px] object-cover rounded-2xl shadow-sm">
+
+                    <!-- Indicador lateral de puntos -->
+                    <div class="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>
+                        <span class="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>
+                        <span class="w-4 h-4 rounded-full border border-zinc-800 flex items-center justify-center">
+                            <span class="w-1.5 h-1.5 rounded-full bg-zinc-900"></span>
+                        </span>
+                        <span class="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>
+                    </div>
+
+                    <!-- Anillo Orbital Curvo con botón "< >" -->
+                    <div class="w-4/5 h-5 border-b-2 border-zinc-400 rounded-b-[100%] relative mt-1 flex items-center justify-center">
+                        <button type="button" onclick="cycleNextProductInModal()"
+                                title="Cambiar vista / siguiente prenda"
+                                class="absolute -bottom-3 w-7 h-7 rounded-full bg-[#333333] text-white text-[10px] flex items-center justify-center shadow">
+                            <i class="fa-solid fa-arrows-left-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tira de Miniaturas con Scroll Lateral -->
+                <div id="modalThumbsRow" class="flex items-center gap-2.5 w-full mt-5 overflow-x-auto no-scrollbar py-1"></div>
+            </div>
+
+            <!-- Columna Derecha: Info, Tallas Tipográficas, Colores, Precios Mayor/Detal y Pestaña Reseñas -->
+            <div class="md:col-span-6 flex flex-col justify-between">
+                <div>
+                    <span id="modalProductCategory" class="text-[11px] font-bold uppercase tracking-widest text-zinc-400">CATEGORÍA</span>
+                    <h3 id="modalProductName" class="text-xl sm:text-2xl font-extrabold text-[#141414] mt-0.5 leading-tight">Nombre de Prenda</h3>
+
+                    <!-- Tarjetas de Precio Detal vs Precio al Mayor -->
+                    <div class="mt-4 grid grid-cols-2 gap-3">
+                        <div class="p-3.5 rounded-2xl bg-[#F6F6F6] border border-zinc-200/70">
+                            <span class="text-[10px] font-bold uppercase text-zinc-400 block">Precio al Detal</span>
+                            <span id="modalPriceRetailUsd" class="text-xl font-extrabold text-[#141414] block mt-0.5">$0.00 USD</span>
+                            <span id="modalPriceRetailBs" class="text-[11px] text-zinc-400 font-medium">Bs. 0.00</span>
+                        </div>
+                        <div class="p-3.5 rounded-2xl bg-[#333333] text-white relative overflow-hidden">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-bold uppercase text-zinc-300">Precio al Mayor</span>
+                                <span id="modalDiscountBadge" class="px-2 py-0.5 rounded-full bg-white text-[#141414] text-[10px] font-extrabold">-30%</span>
+                            </div>
+                            <span id="modalPriceWholesaleUsd" class="text-xl font-extrabold text-white block mt-0.5">$0.00 USD</span>
+                            <span id="modalWholesaleRule" class="text-[10px] text-zinc-300 block">Desde 4 uds o 6 surtidas</span>
+                        </div>
+                    </div>
+
+                    <!-- FILA DE TALLAS Y COLORES -->
+                    <div class="mt-4 py-3.5 px-4 rounded-2xl bg-[#FAFAFA] border border-zinc-200/70 flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <div id="modalSizesContainer" class="flex items-center gap-1"></div>
+                            <p class="text-[11px] text-zinc-400 font-medium mt-1 pl-1">
+                                Guía de Tallas · Talla: <strong id="modalSelectedSizeName" class="text-[#141414]">M</strong>
+                            </p>
+                        </div>
+
+                        <div class="text-right">
+                            <div id="modalColorsContainer" class="flex items-center justify-end gap-2.5"></div>
+                            <p class="text-[11px] text-zinc-400 font-medium mt-1.5">
+                                Colores · <strong id="modalSelectedColorName" class="text-[#141414]">Negro</strong>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Selector de Cantidad + Botón Rápido Mayorista -->
+                    <div class="mt-3.5 flex flex-wrap items-center justify-between gap-3 px-1">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs font-bold text-zinc-500">Unidades:</span>
+                            <div class="inline-flex items-center bg-[#F3F3F3] rounded-full p-1">
+                                <button type="button" onclick="adjustModalQty(-1)"
+                                        class="w-7 h-7 rounded-full bg-white text-[#141414] font-bold text-sm shadow-2xs hover:bg-[#2B2B2B] hover:text-white transition">&minus;</button>
+                                <span id="modalQtyValue" class="w-9 text-center font-extrabold text-sm text-[#141414]">1</span>
+                                <button type="button" onclick="adjustModalQty(1)"
+                                        class="w-7 h-7 rounded-full bg-white text-[#141414] font-bold text-sm shadow-2xs hover:bg-[#2B2B2B] hover:text-white transition">&#43;</button>
+                            </div>
+                        </div>
+
+                        <button type="button" id="btnSetWholesaleQty" onclick="setModalWholesaleQty()"
+                                class="text-xs font-bold text-[#141414] bg-[#F3F3F3] hover:bg-[#2B2B2B] hover:text-white px-3.5 py-2 rounded-full transition">
+                            ⚡ Aplicar mínimo al mayor
+                        </button>
+                    </div>
+                    <p id="modalLivePriceStatus" class="text-[11px] text-zinc-500 mt-1 px-1">Se aplicará tarifa Detal</p>
+
+                    <!-- PESTAÑAS EN ESPAÑOL: Mayoreo | Descripción | Reseñas -->
+                    <div class="mt-4">
+                        <div class="grid grid-cols-3 border-b border-zinc-200 text-xs font-bold text-center">
+                            <button type="button" onclick="switchModalTab('closet')" id="mTabBtn-closet"
+                                    class="py-2.5 border-b-2 border-transparent text-zinc-400 hover:text-black">
+                                Mayoreo y Envíos
+                            </button>
+                            <button type="button" onclick="switchModalTab('about')" id="mTabBtn-about"
+                                    class="py-2.5 border-b-2 border-[#141414] text-[#141414]">
+                                Descripción
+                            </button>
+                            <button type="button" onclick="switchModalTab('reviews')" id="mTabBtn-reviews"
+                                    class="py-2.5 border-b-2 border-transparent text-zinc-400 hover:text-black">
+                                Reseñas (<span id="modalReviewsCountTab">0</span>)
+                            </button>
+                        </div>
+
+                        <div class="py-3 text-xs text-zinc-500 leading-relaxed">
+                            <!-- Panel 1: Mayoreo & Envíos -->
+                            <div id="mTabPanel-closet" class="hidden space-y-1.5">
+                                <p>• <strong>Precio al Mayor:</strong> Se activa automáticamente al llevar el mínimo del modelo o al sumar <strong>{{ store_settings.global_wholesale_min_units }} prendas surtidas</strong> en tu bolsa.</p>
+                                <p>• <strong>Envíos:</strong> Despachos nacionales por MRW y Zoom, entrega a domicilio y retiro personal.</p>
+                            </div>
+
+                            <!-- Panel 2: Descripción -->
+                            <div id="mTabPanel-about">
+                                <p id="modalProductDesc"></p>
+                            </div>
+
+                            <!-- Panel 3: Reseñas (Solo cuentas registradas pueden comentar) -->
+                            <div id="mTabPanel-reviews" class="hidden space-y-3">
+                                <div id="modalReviewsList" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
+
+                                <!-- Aviso para visitantes sin cuenta iniciada -->
+                                <div id="modalReviewAuthRequired" class="bg-[#F6F6F6] rounded-2xl p-3.5 text-center border border-zinc-200/80 space-y-2">
+                                    <p class="text-[11px] font-bold text-[#141414]">
+                                        <i class="fa-solid fa-lock mr-1 text-zinc-600"></i> Solo usuarios con cuenta registrada pueden comentar esta prenda
+                                    </p>
+                                    <div class="flex items-center justify-center gap-2">
+                                        <a href="{% url 'catalog:customer_login' %}"
+                                           class="px-3.5 py-1.5 rounded-full bg-[#2B2B2B] text-white font-bold text-[11px]">
+                                            Iniciar Sesión
+                                        </a>
+                                        <a href="{% url 'catalog:customer_register' %}"
+                                           class="px-3.5 py-1.5 rounded-full bg-white border border-zinc-300 text-[#141414] font-bold text-[11px]">
+                                            Crear Cuenta
+                                        </a>
+                                    </div>
+                                </div>
+
+                                <!-- Formulario simple para comentar la prenda (solo estrellas y comentario) -->
+                                <form id="modalReviewForm" onsubmit="submitModalProductReview(event)" class="hidden bg-[#F6F6F6] rounded-2xl p-4 space-y-3 border border-zinc-200/80">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <span class="text-xs font-extrabold text-[#141414] flex items-center gap-1.5">
+                                            <i class="fa-solid fa-circle-check text-emerald-600 text-[11px]"></i>
+                                            <span id="modalRevLoggedUser" class="text-[#141414]">Usuario</span>
+                                        </span>
+                                        <div class="flex items-center gap-1" id="modalStarsPicker">
+                                            <button type="button" onclick="setModalReviewStars(1)" class="text-base text-amber-400 hover:scale-110 transition">★</button>
+                                            <button type="button" onclick="setModalReviewStars(2)" class="text-base text-amber-400 hover:scale-110 transition">★</button>
+                                            <button type="button" onclick="setModalReviewStars(3)" class="text-base text-amber-400 hover:scale-110 transition">★</button>
+                                            <button type="button" onclick="setModalReviewStars(4)" class="text-base text-amber-400 hover:scale-110 transition">★</button>
+                                            <button type="button" onclick="setModalReviewStars(5)" class="text-base text-amber-400 hover:scale-110 transition">★</button>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="modalRevRating" value="5">
+
+                                    <textarea id="modalRevComment" rows="2" required
+                                              placeholder="Escribe tu comentario sobre esta prenda..."
+                                              class="w-full px-3.5 py-2.5 text-xs bg-white border border-zinc-200 rounded-xl text-[#141414] focus:outline-none focus:border-[#2B2B2B] resize-none"></textarea>
+
+                                    <button type="submit" id="btnSubmitModalRev"
+                                            class="w-full py-2.5 rounded-xl bg-[#2B2B2B] hover:bg-black text-white font-bold text-xs transition shadow-2xs">
+                                        Publicar Comentario
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BOTONES PÍLDORA INFERIORES EN ESPAÑOL -->
+                <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-3">
+                    <button type="button" onclick="addFromModalToCart(false)"
+                            class="py-3.5 px-5 rounded-full border border-zinc-300 bg-white hover:bg-zinc-100 text-[#141414] font-bold text-xs sm:text-sm transition shadow-2xs">
+                        Agregar a la Bolsa
+                    </button>
+                    <button type="button" onclick="addFromModalToCart(true)"
+                            class="py-3.5 px-5 rounded-full bg-[#333333] hover:bg-black text-white font-bold text-xs sm:text-sm transition shadow-md">
+                        Comprar Ahora
+                    </button>
+                </div>
+
+                <!-- Enlace directo WhatsApp al dueño -->
+                <div class="mt-2.5 text-center">
+                    <a id="modalWhatsappDirectBtn" href="#" target="_blank"
+                       class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-500 hover:text-[#141414]">
+                        <i class="fa-brands fa-whatsapp text-emerald-600 text-sm"></i>
+                        <span>Consultar esta prenda directamente con la tienda</span>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    window.CATALOG_PRODUCTS = {{ products_json|safe }};
+
+    function handlePromoBannerClick() {
+        const customLink = "{{ store_settings.promo_button_link|escapejs }}";
+        const productId = {% if store_settings.promo_product %}{{ store_settings.promo_product.id }}{% elif products.0 %}{{ products.0.id }}{% else %}null{% endif %};
+
+        if (customLink && customLink.trim()) {
+            window.location.href = customLink.trim();
+        } else if (productId) {
+            openProductDetailModal(productId);
+        }
+    }
+
+    function applyCatalogFilter(param, value) {
+        const url = new URL(window.location.href);
+        if (!value || value === 'todas' || value === 'todos' || value === '0') {
+            url.searchParams.delete(param);
+        } else {
+            url.searchParams.set(param, value);
+        }
+        window.location.href = url.pathname + url.search;
+    }
+
+    function resetAllFilters() {
+        window.location.href = "{% url 'catalog:index' %}";
+    }
+
+    function toggleFilterPanel() {
+        const body = document.getElementById('filterPanelContent');
+        const chevron = document.getElementById('filterBarChevron');
+        if (!body) return;
+        const isHidden = body.classList.toggle('hidden');
+        if (chevron) {
+            chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+        // Si se abre en móvil, hacer scroll suave para que sea cómodo de ver
+        if (!isHidden && window.innerWidth < 640) {
+            body.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+</script>
+{% endblock %}
